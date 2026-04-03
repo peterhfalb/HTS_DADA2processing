@@ -206,23 +206,10 @@ if command -v module &> /dev/null; then
     echo "  ✓ dada2 is installed"
   else
     echo "  dada2 not found, installing from Bioconductor..."
-    Rscript << 'RINSTALL'
-if (!require("dada2", quietly = TRUE)) {
-  if (!require("BiocManager", quietly = TRUE)) {
-    install.packages("BiocManager", repos = "http://cran.us.r-project.org")
-  }
-  BiocManager::install("dada2")
-}
-library(dada2)
-cat("✓ dada2 installed successfully\n")
-RINSTALL
+    Rscript -e 'if (!require("dada2", quietly = TRUE)) { if (!require("BiocManager", quietly = TRUE)) { install.packages("BiocManager", repos = "http://cran.us.r-project.org") }; BiocManager::install("dada2") }; library(dada2); cat("✓ dada2 installed successfully\n")'
     if [ $? -ne 0 ]; then
       echo "  WARNING: Failed to install dada2. You may need to install it manually on MSI:"
-      echo "    Rscript << 'EOF'"
-      echo "    if (!require('BiocManager', quietly = TRUE))"
-      echo "      install.packages('BiocManager')"
-      echo "    BiocManager::install('dada2')"
-      echo "    EOF"
+      echo "    Rscript -e 'if (!require(\"BiocManager\", quietly = TRUE)) { install.packages(\"BiocManager\") }; BiocManager::install(\"dada2\")'"
     fi
   fi
 
