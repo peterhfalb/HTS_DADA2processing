@@ -44,8 +44,135 @@ echo "--- Installing run_dada2processing command ---"
 
 mkdir -p "$HOME/bin"
 
-# Copy (not symlink) the wrapper script to ~/bin so it works from anywhere
-cp "$REPO_DIR/run_dada2processing.sh" "$HOME/bin/run_dada2processing"
+# Create the wrapper script with the PIPELINE_DIR path embedded
+cat > "$HOME/bin/run_dada2processing" << 'WRAPPER_SCRIPT'
+#!/bin/bash
+# DADA2 Pipeline User-Facing Wrapper
+# Auto-installed by setup.sh with PIPELINE_DIR embedded
+
+PIPELINE_DIR="PIPELINE_DIR_PLACEHOLDER"
+
+set -euo pipefail
+
+print_help() {
+cat << 'HELP'
+run_dada2processing — Submit the DADA2 processing pipeline as a SLURM job
+
+USAGE:
+  run_dada2processing <input_fastq_dir> <output_dir> <marker_gene> <platform> [OPTIONS]
+
+REQUIRED ARGUMENTS:
+  input_fastq_dir     Path to directory containing raw fastq.gz files
+  output_dir          Path to project output folder (will be created if needed)
+  marker_gene         Sequencing target — one of:
+                        16S-V4      bacterial 16S V4 region
+                        ITS1        fungal ITS1 region
+                        ITS2        fungal ITS2 region
+                        18S-V4      microeukaryote 18S V4 region (protists)
+                        18S-AMF     arbuscular mycorrhizal fungi 18S
+  platform            Sequencing platform — one of:
+                        illumina    Illumina MiSeq/NovaSeq
+                        aviti       Aviti (Element Biosciences)
+
+OPTIONS:
+  --quality <good|bad>  Quality filtering stringency (default: good)
+                        good: maxEE=c(2,2), stricter
+                        bad:  maxEE=c(4,6), more permissive
+  -h, --help            Show this help message and exit
+
+EXAMPLES:
+  run_dada2processing /path/to/fastq /path/to/output 16S-V4 illumina
+  run_dada2processing /path/to/fastq /path/to/output ITS2 aviti --quality good
+
+HELP
+}
+
+CONFIG="$PIPELINE_DIR/config.sh"
+[ -f "$CONFIG" ] || {
+  echo "ERROR: config.sh not found at $CONFIG"
+  echo "Please re-run setup.sh in the HTS_DADA2processing directory."
+  exit 1
+}
+
+source "$CONFIG"
+[ -n "${PIPELINE_DIR:-}" ] || { echo "ERROR: PIPELINE_DIR not set in config.sh"; exit 1; }
+[ -n "${SLURM_EMAIL:-}" ] || { echo "ERROR: SLURM_EMAIL not set in config.sh"; exit 1; }
+
+QUALITY="good"
+
+if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+  print_help
+  exit 0
+fi
+
+if [ $# -lt 4 ]; then
+  echo "ERROR: Missing required arguments"
+  echo "Usage: run_dada2processing <input_fastq_dir> <output_dir> <marker_gene> <platform> [--quality bad]"
+  exit 1
+fi
+
+INPUT_DIR="$1"
+OUTPUT_DIR="$2"
+MARKER_GENE="$3"
+PLATFORM="$4"
+shift 4
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --quality)
+      [ $# -lt 2 ] && { echo "ERROR: --quality requires an argument (good or bad)"; exit 1; }
+      QUALITY="$2"
+      shift 2
+      ;;
+    *)
+      echo "ERROR: Unknown option: $1"
+      exit 1
+      ;;
+  esac
+done
+
+[ -d "$INPUT_DIR" ] || { echo "ERROR: Input directory not found: $INPUT_DIR"; exit 1; }
+ls "$INPUT_DIR"/*_R1_*.fastq.gz > /dev/null 2>&1 || ls "$INPUT_DIR"/*_R1.fastq.gz > /dev/null 2>&1 || { echo "ERROR: No fastq.gz files found in $INPUT_DIR"; exit 1; }
+
+[[ "$MARKER_GENE" =~ ^(16S-V4|ITS1|ITS2|18S-V4|18S-AMF)$ ]] || { echo "ERROR: Invalid marker_gene: $MARKER_GENE"; exit 1; }
+[[ "$PLATFORM" =~ ^(illumina|aviti)$ ]] || { echo "ERROR: Invalid platform: $PLATFORM"; exit 1; }
+[[ "$QUALITY" =~ ^(good|bad)$ ]] || { echo "ERROR: Invalid quality: $QUALITY"; exit 1; }
+
+mkdir -p "$OUTPUT_DIR"
+
+echo ""
+echo "============================================================"
+echo "  DADA2 Processing Pipeline"
+echo "============================================================"
+echo "  Input directory:  $INPUT_DIR"
+echo "  Output directory: $OUTPUT_DIR"
+echo "  Marker gene:      $MARKER_GENE"
+echo "  Platform:         $PLATFORM"
+echo "  Quality:          $QUALITY"
+echo "============================================================"
+echo ""
+
+echo "Submitting SLURM job..."
+sbatch \
+  --mail-user="$SLURM_EMAIL" \
+  --output="$OUTPUT_DIR/pipeline_%j.out" \
+  --error="$OUTPUT_DIR/pipeline_%j.err" \
+  --export=ALL,PIPELINE_DIR="$PIPELINE_DIR" \
+  "$PIPELINE_DIR/dada2processing_msiSLURM.sh" \
+  "$INPUT_DIR" \
+  "$OUTPUT_DIR" \
+  "$MARKER_GENE" \
+  "$PLATFORM" \
+  "$QUALITY"
+
+echo ""
+echo "Job submitted! Check your email for status updates."
+echo "Monitor progress with: tail -f $OUTPUT_DIR/pipeline_*.out"
+echo ""
+WRAPPER_SCRIPT
+
+# Replace the placeholder with the actual PIPELINE_DIR
+sed -i "s|PIPELINE_DIR_PLACEHOLDER|$REPO_DIR|g" "$HOME/bin/run_dada2processing"
 chmod +x "$HOME/bin/run_dada2processing"
 
 echo "  Installed run_dada2processing to $HOME/bin"
