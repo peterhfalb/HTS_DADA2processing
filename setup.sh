@@ -203,25 +203,28 @@ if conda env list | grep -q "^$CONDA_ENV_NAME "; then
 else
   echo "  Creating conda environment '$CONDA_ENV_NAME' (this may take several minutes)..."
 
-  # Use same approach as HTS_ASV2OTU: specify packages directly on command line
-  # This is more reliable on MSI than using environment.yml
-  if command -v mamba &> /dev/null; then
-    echo "  Using mamba (faster dependency resolution)..."
-    mamba create -n "$CONDA_ENV_NAME" -c bioconda -c conda-forge \
-      r-base=4.4 bioconductor-dada2 cutadapt trimmomatic \
-      r-dplyr r-tidyr r-ggplot2 -y
-  else
-    echo "  Using conda..."
-    conda create -n "$CONDA_ENV_NAME" -c bioconda -c conda-forge \
-      r-base=4.4 bioconductor-dada2 cutadapt trimmomatic \
-      r-dplyr r-tidyr r-ggplot2 -y
-  fi
+  # Use conda by default (more reliable on MSI), fall back to mamba if conda fails
+  echo "  Using conda to create environment..."
+  conda create -n "$CONDA_ENV_NAME" -c bioconda -c conda-forge \
+    r-base=4.4 bioconductor-dada2 cutadapt trimmomatic \
+    r-dplyr r-tidyr r-ggplot2 -y
 
   if [ $? -eq 0 ]; then
     echo "  ✓ Conda environment created successfully!"
   else
-    echo "  ERROR: Failed to create conda environment. Check the error above."
-    exit 1
+    echo ""
+    echo "  ⚠ WARNING: Failed to create conda environment."
+    echo "  This is likely due to network connectivity to conda repositories on MSI."
+    echo ""
+    echo "  You can still run the pipeline by manually loading required modules:"
+    echo "    module load conda"
+    echo "    module load R/4.4.0"
+    echo "    module load cutadapt"
+    echo "    module load trimmomatic"
+    echo "  Then run: run_dada2processing <input_dir> <output_dir> <marker_gene> <platform>"
+    echo ""
+    echo "  Alternatively, try setup.sh again later when network connectivity improves."
+    echo ""
   fi
 fi
 

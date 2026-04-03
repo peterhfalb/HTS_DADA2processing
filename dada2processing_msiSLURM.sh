@@ -18,26 +18,28 @@ set -euo pipefail
 # Load user configuration (PIPELINE_DIR passed by wrapper)
 [ -n "${PIPELINE_DIR:-}" ] || { echo "ERROR: PIPELINE_DIR not set. Submit via run_dada2processing wrapper."; exit 1; }
 
-# Load modules and conda
+# Load modules
 module purge
+
+# Try to use conda environment if it exists, otherwise fall back to module loads
 module load conda
-
-# Activate DADA2 conda environment (matches HTS_ASV2OTU pattern)
 source "$(conda info --base)/etc/profile.d/conda.sh"
-conda activate dada2_processing
 
-if [ $? -ne 0 ]; then
-  echo "ERROR: Failed to activate dada2_processing conda environment"
-  echo "Please run setup.sh to create the environment first."
-  exit 1
+if conda env list | grep -q "^dada2_processing "; then
+  echo "Activating conda environment dada2_processing..."
+  conda activate dada2_processing
+  export PATH="$HOME/.conda/envs/dada2_processing/bin:$PATH"
+  unset R_HOME 2>/dev/null || true
+  echo "✓ Conda environment activated"
+else
+  echo "Conda environment dada2_processing not found, loading modules directly..."
+  module load R/4.4.0
+  module load cutadapt
+  module load trimmomatic
+  echo "✓ Required modules loaded"
 fi
 
-# Ensure conda R takes priority over system R
-export PATH="$HOME/.conda/envs/dada2_processing/bin:$PATH"
-unset R_HOME 2>/dev/null || true
-
-echo "✓ Conda environment activated"
-echo "Python: $(python --version)"
+echo "Python: $(python --version 2>&1 || echo 'not available')"
 echo "R: $(Rscript --version 2>&1)"
 
 # Parse arguments
