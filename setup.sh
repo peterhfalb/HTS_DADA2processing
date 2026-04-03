@@ -206,10 +206,10 @@ else
   # Use mamba if available (faster), otherwise use conda
   if command -v mamba &> /dev/null; then
     echo "  Using mamba (faster dependency resolution)..."
-    mamba env create -f "$REPO_DIR/environment.yml" -y
+    mamba env create -f "$REPO_DIR/environment.yml"
   else
     echo "  Using conda..."
-    conda env create -f "$REPO_DIR/environment.yml" -y
+    conda env create -f "$REPO_DIR/environment.yml"
   fi
 
   if [ $? -eq 0 ]; then
