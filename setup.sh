@@ -201,15 +201,20 @@ if conda env list | grep -q "^$CONDA_ENV_NAME "; then
   echo "  Conda environment '$CONDA_ENV_NAME' already exists."
   echo "  To recreate it, run: conda env remove -n $CONDA_ENV_NAME"
 else
-  echo "  Creating conda environment '$CONDA_ENV_NAME'..."
+  echo "  Creating conda environment '$CONDA_ENV_NAME' (this may take several minutes)..."
 
-  # Use mamba if available (faster), otherwise use conda
+  # Use same approach as HTS_ASV2OTU: specify packages directly on command line
+  # This is more reliable on MSI than using environment.yml
   if command -v mamba &> /dev/null; then
     echo "  Using mamba (faster dependency resolution)..."
-    mamba env create -f "$REPO_DIR/environment.yml"
+    mamba create -n "$CONDA_ENV_NAME" -c bioconda -c conda-forge \
+      r-base=4.4 bioconductor-dada2 cutadapt trimmomatic \
+      r-dplyr r-tidyr r-ggplot2 -y
   else
     echo "  Using conda..."
-    conda env create -f "$REPO_DIR/environment.yml"
+    conda create -n "$CONDA_ENV_NAME" -c bioconda -c conda-forge \
+      r-base=4.4 bioconductor-dada2 cutadapt trimmomatic \
+      r-dplyr r-tidyr r-ggplot2 -y
   fi
 
   if [ $? -eq 0 ]; then
