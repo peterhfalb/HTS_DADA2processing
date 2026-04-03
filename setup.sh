@@ -172,7 +172,9 @@ echo ""
 WRAPPER_SCRIPT
 
 # Replace the placeholder with the actual PIPELINE_DIR
-sed -i "s|PIPELINE_DIR_PLACEHOLDER|$REPO_DIR|g" "$HOME/bin/run_dada2processing"
+# Use sed with proper escaping of the path
+sed -i.bak "s|PIPELINE_DIR_PLACEHOLDER|$(printf '%s\n' "$REPO_DIR" | sed -e 's/[\/&]/\\&/g')|g" "$HOME/bin/run_dada2processing"
+rm -f "$HOME/bin/run_dada2processing.bak"
 chmod +x "$HOME/bin/run_dada2processing"
 
 echo "  Installed run_dada2processing to $HOME/bin"
@@ -185,52 +187,57 @@ echo "    source ~/.bashrc"
 # ------------------------------------------------------------------------------
 
 echo ""
-echo "--- Setting up conda environment ---"
+echo "--- Checking for required modules and R packages ---"
 
-# Load conda module (matches HTS_ASV2OTU pattern)
-module load conda
+# Check if we're on MSI (where module command is available)
+if command -v module &> /dev/null; then
+  # Load R module and check for dada2
+  module load R/4.4.0
 
-# Source conda initialization
-CONDA_BASE=$(conda info --base 2>/dev/null) || { echo "ERROR: conda not found. Please load/install conda first."; exit 1; }
-source "$CONDA_BASE/etc/profile.d/conda.sh"
-
-CONDA_ENV_NAME="dada2_processing"
-
-# Check if environment already exists
-if conda env list | grep -q "^$CONDA_ENV_NAME "; then
-  echo "  Conda environment '$CONDA_ENV_NAME' already exists."
-  echo "  To recreate it, run: conda env remove -n $CONDA_ENV_NAME"
-else
-  echo "  Creating conda environment '$CONDA_ENV_NAME' (this may take several minutes)..."
-
-  # Use conda by default (more reliable on MSI), fall back to mamba if conda fails
-  echo "  Using conda to create environment..."
-  conda create -n "$CONDA_ENV_NAME" -c bioconda -c conda-forge \
-    r-base=4.4 bioconductor-dada2 cutadapt trimmomatic \
-    r-dplyr r-tidyr r-ggplot2 -y
-
-  if [ $? -eq 0 ]; then
-    echo "  ✓ Conda environment created successfully!"
+  echo "  Checking if dada2 is installed in R/4.4.0..."
+  if Rscript -e "library(dada2)" 2>/dev/null; then
+    echo "  ✓ dada2 is installed"
   else
-    echo ""
-    echo "  ⚠ WARNING: Failed to create conda environment."
-    echo "  This is likely due to network connectivity to conda repositories on MSI."
-    echo ""
-    echo "  You can still run the pipeline by manually loading required modules:"
-    echo "    module load conda"
-    echo "    module load R/4.4.0"
-    echo "    module load cutadapt"
-    echo "    module load trimmomatic"
-    echo "  Then run: run_dada2processing <input_dir> <output_dir> <marker_gene> <platform>"
-    echo ""
-    echo "  Alternatively, try setup.sh again later when network connectivity improves."
-    echo ""
+    echo "  dada2 not found, installing from Bioconductor..."
+    Rscript << 'RINSTALL'
+if (!require("dada2", quietly = TRUE)) {
+  if (!require("BiocManager", quietly = TRUE)) {
+    install.packages("BiocManager", repos = "http://cran.us.r-project.org")
+  }
+  BiocManager::install("dada2")
+}
+library(dada2)
+cat("✓ dada2 installed successfully\n")
+RINSTALL
+    if [ $? -ne 0 ]; then
+      echo "  WARNING: Failed to install dada2. You may need to install it manually on MSI:"
+      echo "    Rscript << 'EOF'"
+      echo "    if (!require('BiocManager', quietly = TRUE))"
+      echo "      install.packages('BiocManager')"
+      echo "    BiocManager::install('dada2')"
+      echo "    EOF"
+    fi
   fi
+
+  echo ""
+  echo "  Required modules for the pipeline:"
+  echo "    - R/4.4.0 (for DADA2 processing) ✓"
+  echo "    - cutadapt (for adapter trimming)"
+  echo "    - trimmomatic (for Aviti adapter trimming)"
+else
+  echo "  (Not on MSI — module system not available)"
+  echo ""
+  echo "  When you run on MSI, these modules will be loaded automatically:"
+  echo "    - R/4.4.0 (with dada2 package installed)"
+  echo "    - cutadapt (for adapter trimming)"
+  echo "    - trimmomatic (for Aviti adapter trimming)"
 fi
 
 echo ""
-echo "  To activate the environment in the future, run:"
-echo "    conda activate $CONDA_ENV_NAME"
+echo "  If you encounter module loading errors, manually load them:"
+echo "    module load R/4.4.0 cutadapt trimmomatic"
+echo ""
+echo "  ✓ Module-based dependency approach ready"
 
 # ------------------------------------------------------------------------------
 # 4. Check for Aviti adapter files
