@@ -11,8 +11,13 @@ command -v cutadapt &> /dev/null || { echo "ERROR: cutadapt not loaded"; exit 1;
 
 echo "Removing adapters and primers from 16S-V4 Illumina data..."
 
-# Create output directory
-mkdir -p 01_adapter
+# Use OUTPUT_DIR if set by SLURM script, otherwise use current directory
+OUTPUT_DIR="${OUTPUT_DIR:-.}"
+ADAPTER_DIR="$OUTPUT_DIR/01_adapter"
+FILTERED_DIR="$OUTPUT_DIR/02_filtered"
+
+# Create output directories
+mkdir -p "$ADAPTER_DIR" "$FILTERED_DIR"
 
 # Generate cutadapt commands for all samples
 for i in *_R1_001.fastq.gz; do
@@ -22,10 +27,10 @@ for i in *_R1_001.fastq.gz; do
     -a TATGGTAATTGTGTGNCAGCNGCCGCGGTAA \
     -g ATTAGANACCCNNGTAGTCCGGCTGGCTGACT \
     -A AGTCAGCCAGCCGGACTACNVGGGTNTCTAAT \
-    -o 01_adapter/${i//_R1_001.fastq.gz/_R1_001.fastq.gz} \
-    -p 01_adapter/${i//_R1_001.fastq.gz/_R2_001.fastq.gz} \
+    -o $ADAPTER_DIR/${i//_R1_001.fastq.gz/_R1_001.fastq.gz} \
+    -p $ADAPTER_DIR/${i//_R1_001.fastq.gz/_R2_001.fastq.gz} \
     ${i} ${i//_R1_/_R2_} \
-    > 01_adapter/cutadapt.${i//_R1_001.fastq.gz/.log.txt}" \
+    > $ADAPTER_DIR/cutadapt.${i//_R1_001.fastq.gz/.log.txt}" \
   >> run_cutadapt.sh
 done
 
@@ -35,25 +40,14 @@ echo "Running cutadapt trimming in parallel..."
 parallel < run_cutadapt.sh
 
 # Organize logs
-cd 01_adapter
-mkdir -p logs
-mv cutadapt*.log.txt logs/ 2>/dev/null || true
+mkdir -p "$ADAPTER_DIR/logs"
+mv "$ADAPTER_DIR"/cutadapt*.log.txt "$ADAPTER_DIR/logs/" 2>/dev/null || true
 
 # Summary
 echo "Adapter trimming complete."
-grep "passing" logs/* > ../dada2output/summary_adapter_trimming_16S-V4.txt 2>/dev/null || echo "No logs found"
-
-# Prepare for primer trimming (next step)
-echo "Creating 02_filtered directory for primer trimming..."
-cd ..
-mkdir -p 02_filtered
-
-# Note: Primers are trimmed in the above cutadapt call using the -g and -a flags
-# 515F: GTGYCAGCMGCCGCGGTAA (forward, at 5' of R1)
-# 806R: GGACTACNVGGGTWTCTAAT (reverse, at 5' of R2 after reverse complement)
-# These will be trimmed in the next step via cutadapt with primer-specific command
+grep "passing" "$ADAPTER_DIR/logs/"* > "$OUTPUT_DIR/summary_adapter_trimming_16S-V4.txt" 2>/dev/null || echo "No logs found"
 
 echo ""
 echo "16S-V4 adapter trimming complete."
-echo "Trimmed paired reads are in 01_adapter/"
+echo "Trimmed paired reads are in $ADAPTER_DIR/"
 echo ""

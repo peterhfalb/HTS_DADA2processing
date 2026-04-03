@@ -80,10 +80,13 @@ search_primer() {
   # Search in the FASTQ file (handle gzip and uncompressed)
   local count=0
   if [[ "$file" == *.gz ]]; then
-    count=$(zgrep -c "$grep_pattern" "$file" 2>/dev/null || echo 0)
+    count=$(zgrep -c "$grep_pattern" "$file" 2>/dev/null | head -1 || echo "0")
   else
-    count=$(grep -c "$grep_pattern" "$file" 2>/dev/null || echo 0)
+    count=$(grep -c "$grep_pattern" "$file" 2>/dev/null | head -1 || echo "0")
   fi
+
+  # Remove any whitespace
+  count=$(echo "$count" | tr -d ' \n')
 
   echo "$count"
 }

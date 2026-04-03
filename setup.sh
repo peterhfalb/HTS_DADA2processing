@@ -181,21 +181,47 @@ echo "    echo 'export PATH=\$HOME/bin:\$PATH' >> ~/.bashrc"
 echo "    source ~/.bashrc"
 
 # ------------------------------------------------------------------------------
-# 3. Verify R and required packages
+# 3. Create conda environment with DADA2 and dependencies
 # ------------------------------------------------------------------------------
 
 echo ""
-echo "--- Verifying R environment ---"
+echo "--- Setting up conda environment ---"
 
-if ! command -v Rscript &> /dev/null; then
-  echo "  WARNING: Rscript not found. You may need to load R module on MSI:"
-  echo "    module load R/4.4.0-openblas-rocky8"
+# Check if conda is available
+if ! command -v conda &> /dev/null; then
+  echo "  WARNING: conda not found. Please load conda module on MSI:"
+  echo "    module load conda"
+  echo "  Then re-run setup.sh"
 else
-  echo "  R is available: $(Rscript --version 2>&1 | head -1)"
-fi
+  CONDA_ENV_NAME="dada2_processing"
 
-# Check for dada2 package (but don't fail if it's not installed yet — users might install it via conda)
-echo "  Note: dada2 and other R packages will be loaded via module on MSI at runtime"
+  # Check if environment already exists
+  if conda env list | grep -q "^$CONDA_ENV_NAME "; then
+    echo "  Conda environment '$CONDA_ENV_NAME' already exists."
+    echo "  To recreate it, run: conda env remove -n $CONDA_ENV_NAME"
+  else
+    echo "  Creating conda environment '$CONDA_ENV_NAME'..."
+
+    # Use mamba if available (faster), otherwise use conda
+    if command -v mamba &> /dev/null; then
+      echo "  Using mamba (faster dependency resolution)..."
+      mamba env create -f "$REPO_DIR/environment.yml"
+    else
+      echo "  Using conda..."
+      conda env create -f "$REPO_DIR/environment.yml"
+    fi
+
+    if [ $? -eq 0 ]; then
+      echo "  ✓ Conda environment created successfully!"
+    else
+      echo "  WARNING: Failed to create conda environment. Check the error above."
+    fi
+  fi
+
+  echo ""
+  echo "  To activate the environment, run:"
+  echo "    conda activate $CONDA_ENV_NAME"
+fi
 
 # ------------------------------------------------------------------------------
 # 4. Check for Aviti adapter files

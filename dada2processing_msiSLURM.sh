@@ -20,10 +20,22 @@ set -euo pipefail
 
 # Load modules
 module purge
-module load parallel
-module load cutadapt
-module load trimmomatic/0.39
-module load R/4.4.0-openblas-rocky8
+module load conda
+
+# Activate DADA2 conda environment
+echo "Activating conda environment..."
+source $(conda info --base)/etc/profile.d/conda.sh
+conda activate dada2_processing
+
+if [ $? -ne 0 ]; then
+  echo "ERROR: Failed to activate dada2_processing conda environment"
+  echo "Please run setup.sh to create the environment first."
+  exit 1
+fi
+
+echo "✓ Conda environment activated"
+echo "Python: $(python --version)"
+echo "R: $(Rscript --version 2>&1)"
 
 # Parse arguments
 if [ "$#" -ne 5 ]; then
@@ -89,6 +101,10 @@ echo ""
 # Step 2: Adapter trimming
 echo "Step 2: Adapter and primer trimming..."
 echo "========================================"
+
+# Export variables for adapter trimming scripts
+export OUTPUT_DIR
+export INPUT_DIR
 
 case "$MARKER_GENE,$PLATFORM" in
   16S-V4,illumina)

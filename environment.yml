@@ -1,0 +1,26 @@
+name: dada2_processing
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  # Core tools
+  - python=3.11
+  - r-base=4.4
+  - parallel
+
+  # Bioinformatics tools
+  - cutadapt::cutadapt
+  - trimmomatic
+
+  # R packages
+  - bioconductor-dada2
+  - r-dplyr
+  - r-tidyr
+  - r-ggplot2
+
+  # Utilities
+  - git
+  - wget
+  - grep
+  - gzip
