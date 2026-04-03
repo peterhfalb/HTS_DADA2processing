@@ -190,9 +190,16 @@ echo ""
 echo "--- Checking for required modules and R packages ---"
 
 # Check if we're on MSI (where module command is available)
+# Initialize modules if not already loaded
+if ! command -v module &> /dev/null; then
+  if [ -f /usr/share/Modules/init/bash ]; then
+    source /usr/share/Modules/init/bash
+  fi
+fi
+
 if command -v module &> /dev/null; then
   # Load R module and check for dada2
-  module load R/4.4.0
+  module load R/4.4.2-openblas-rocky8
 
   echo "  Checking if dada2 is installed in R/4.4.0..."
   if Rscript -e "library(dada2)" 2>/dev/null; then
@@ -221,21 +228,21 @@ RINSTALL
 
   echo ""
   echo "  Required modules for the pipeline:"
-  echo "    - R/4.4.0 (for DADA2 processing) ✓"
+  echo "    - R/4.4.2-openblas-rocky8 (for DADA2 processing) ✓"
   echo "    - cutadapt (for adapter trimming)"
   echo "    - trimmomatic (for Aviti adapter trimming)"
 else
   echo "  (Not on MSI — module system not available)"
   echo ""
   echo "  When you run on MSI, these modules will be loaded automatically:"
-  echo "    - R/4.4.0 (with dada2 package installed)"
+  echo "    - R/4.4.2-openblas-rocky8 (with dada2 package installed)"
   echo "    - cutadapt (for adapter trimming)"
   echo "    - trimmomatic (for Aviti adapter trimming)"
 fi
 
 echo ""
 echo "  If you encounter module loading errors, manually load them:"
-echo "    module load R/4.4.0 cutadapt trimmomatic"
+echo "    module load R/4.4.2-openblas-rocky8 cutadapt trimmomatic"
 echo ""
 echo "  ✓ Module-based dependency approach ready"
 

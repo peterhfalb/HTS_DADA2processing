@@ -20,7 +20,7 @@ set -euo pipefail
 
 # Load required modules
 module purge
-module load R/4.4.0
+module load R/4.4.2-openblas-rocky8
 module load cutadapt
 module load trimmomatic
 
