@@ -145,7 +145,7 @@ squeue -u $USER
 | **18S-V4** | 616f/1132r | TTAAARVGYTCGTAGTYG / CCGTCAATTHCTTYAART | PR2 v4.14 | Protists (microeukaryotes) |
 | **18S-AMF** | WANDA_1/AML2_1 | CAGCCGCGGTAATTCCAGCT / GAACCCAAACACTTTGGTTTCC | MaarjAM v2.40 | Arbuscular mycorrhizal fungi |
 
-All databases are stored in Kennedy Lab shared taxonomy folder: `/panfs/jay/groups/4/kennedyp/shared/taxonomy/`
+All databases are stored in Kennedy Lab shared taxonomy folder: `/projects/standard/kennedyp/shared/taxonomy/`
 
 ---
 

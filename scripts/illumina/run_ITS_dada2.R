@@ -75,7 +75,7 @@ uniquesToFasta(seqtab.nochim, fout = file.path(output_dir, "sequences.fasta"))
 
 # Taxonomy assignment using UNITE (Kennedy lab shared folder)
 taxaunite <- assignTaxonomy(seqtab.nochim,
-                            "/panfs/jay/groups/4/kennedyp/shared/taxonomy/UNITE_v9.0_dynamic.fasta.gz",
+                            "/projects/standard/kennedyp/shared/taxonomy/sh_general_release_dynamic_all_19.02.2025_wKennedySynmock.fasta",
                             multithread=TRUE,
                             outputBootstraps = TRUE)
 taxout <- taxaunite$tax

@@ -69,7 +69,7 @@ uniquesToFasta(seqtab.nochim, fout = file.path(output_dir, "sequences.fasta"))
 
 # Taxonomy assignment using MaarjAM for AMF (Kennedy lab shared folder)
 taxamaarjam <- assignTaxonomy(seqtab.nochim,
-                              "/panfs/jay/groups/4/kennedyp/shared/taxonomy/MaarjAM_dada2_v.240.fa.gz",
+                              "/projects/standard/kennedyp/shared/taxonomy/maarjam_dada2_SSU_2021.fasta",
                               multithread=TRUE,
                               outputBootstraps = TRUE)
 taxout <- taxamaarjam$tax

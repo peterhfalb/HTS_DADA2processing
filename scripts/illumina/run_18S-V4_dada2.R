@@ -69,7 +69,7 @@ uniquesToFasta(seqtab.nochim, fout = file.path(output_dir, "sequences.fasta"))
 
 # Taxonomy assignment using PR2 for 18S protists (Kennedy lab shared folder)
 taxapr2 <- assignTaxonomy(seqtab.nochim,
-                          "/panfs/jay/groups/4/kennedyp/shared/taxonomy/pr2_version4.14.0_SSU_dada2.fasta.gz",
+                          "/projects/standard/kennedyp/shared/taxonomy/pr2_version_5.1.1_SSU_dada2.fasta",
                           multithread=TRUE,
                           outputBootstraps = TRUE)
 taxout <- taxapr2$tax

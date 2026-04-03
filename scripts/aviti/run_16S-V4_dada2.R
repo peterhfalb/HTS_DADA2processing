@@ -68,7 +68,7 @@ seqtab.nochim <- readRDS(file.path(output_dir, "seqtab_nochim.rds"))
 uniquesToFasta(seqtab.nochim, fout = file.path(output_dir, "sequences.fasta"))
 
 taxasilva <- assignTaxonomy(seqtab.nochim,
-                            "/panfs/jay/groups/4/kennedyp/shared/taxonomy/silva_nr99_v138.1_train_set.fa.gz",
+                            "/projects/standard/kennedyp/shared/taxonomy/silva_nr99_v138.1_train_set.fa",
                             multithread=TRUE,
                             outputBootstraps = TRUE)
 taxout <- taxasilva$tax
