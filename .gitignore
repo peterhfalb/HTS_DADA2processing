@@ -1,0 +1,27 @@
+# Auto-generated configuration
+config.sh
+
+# Output directories
+dada2output/
+01_adapter/
+02_filtered/
+03_filtered/
+
+# SLURM logs and outputs
+pipeline_*.out
+pipeline_*.err
+*.log
+
+# Temporary files
+*~
+*.swp
+*.swo
+.DS_Store
+
+# R temporary files
+.Rhistory
+.RData
+.Rproj.user/
+
+# Old/archived directories
+dada2processing-main/
