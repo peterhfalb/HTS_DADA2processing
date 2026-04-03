@@ -18,13 +18,12 @@ set -euo pipefail
 # Load user configuration (PIPELINE_DIR passed by wrapper)
 [ -n "${PIPELINE_DIR:-}" ] || { echo "ERROR: PIPELINE_DIR not set. Submit via run_dada2processing wrapper."; exit 1; }
 
-# Load modules
+# Load modules and conda
 module purge
 module load conda
 
-# Activate DADA2 conda environment
-echo "Activating conda environment..."
-source $(conda info --base)/etc/profile.d/conda.sh
+# Activate DADA2 conda environment (matches HTS_ASV2OTU pattern)
+source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate dada2_processing
 
 if [ $? -ne 0 ]; then
@@ -32,6 +31,10 @@ if [ $? -ne 0 ]; then
   echo "Please run setup.sh to create the environment first."
   exit 1
 fi
+
+# Ensure conda R takes priority over system R
+export PATH="$HOME/.conda/envs/dada2_processing/bin:$PATH"
+unset R_HOME 2>/dev/null || true
 
 echo "✓ Conda environment activated"
 echo "Python: $(python --version)"

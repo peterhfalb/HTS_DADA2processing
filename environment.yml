@@ -1,8 +1,7 @@
 name: dada2_processing
 channels:
-  - conda-forge
   - bioconda
-  - defaults
+  - conda-forge
 dependencies:
   # Core tools
   - python=3.11
@@ -10,7 +9,7 @@ dependencies:
   - parallel
 
   # Bioinformatics tools
-  - cutadapt::cutadapt
+  - cutadapt
   - trimmomatic
 
   # R packages
@@ -22,5 +21,4 @@ dependencies:
   # Utilities
   - git
   - wget
-  - grep
   - gzip

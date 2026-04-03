@@ -187,41 +187,42 @@ echo "    source ~/.bashrc"
 echo ""
 echo "--- Setting up conda environment ---"
 
-# Check if conda is available
-if ! command -v conda &> /dev/null; then
-  echo "  WARNING: conda not found. Please load conda module on MSI:"
-  echo "    module load conda"
-  echo "  Then re-run setup.sh"
+# Load conda module (matches HTS_ASV2OTU pattern)
+module load conda
+
+# Source conda initialization
+CONDA_BASE=$(conda info --base 2>/dev/null) || { echo "ERROR: conda not found. Please load/install conda first."; exit 1; }
+source "$CONDA_BASE/etc/profile.d/conda.sh"
+
+CONDA_ENV_NAME="dada2_processing"
+
+# Check if environment already exists
+if conda env list | grep -q "^$CONDA_ENV_NAME "; then
+  echo "  Conda environment '$CONDA_ENV_NAME' already exists."
+  echo "  To recreate it, run: conda env remove -n $CONDA_ENV_NAME"
 else
-  CONDA_ENV_NAME="dada2_processing"
+  echo "  Creating conda environment '$CONDA_ENV_NAME'..."
 
-  # Check if environment already exists
-  if conda env list | grep -q "^$CONDA_ENV_NAME "; then
-    echo "  Conda environment '$CONDA_ENV_NAME' already exists."
-    echo "  To recreate it, run: conda env remove -n $CONDA_ENV_NAME"
+  # Use mamba if available (faster), otherwise use conda
+  if command -v mamba &> /dev/null; then
+    echo "  Using mamba (faster dependency resolution)..."
+    mamba env create -f "$REPO_DIR/environment.yml" -y
   else
-    echo "  Creating conda environment '$CONDA_ENV_NAME'..."
-
-    # Use mamba if available (faster), otherwise use conda
-    if command -v mamba &> /dev/null; then
-      echo "  Using mamba (faster dependency resolution)..."
-      mamba env create -f "$REPO_DIR/environment.yml"
-    else
-      echo "  Using conda..."
-      conda env create -f "$REPO_DIR/environment.yml"
-    fi
-
-    if [ $? -eq 0 ]; then
-      echo "  ✓ Conda environment created successfully!"
-    else
-      echo "  WARNING: Failed to create conda environment. Check the error above."
-    fi
+    echo "  Using conda..."
+    conda env create -f "$REPO_DIR/environment.yml" -y
   fi
 
-  echo ""
-  echo "  To activate the environment, run:"
-  echo "    conda activate $CONDA_ENV_NAME"
+  if [ $? -eq 0 ]; then
+    echo "  ✓ Conda environment created successfully!"
+  else
+    echo "  ERROR: Failed to create conda environment. Check the error above."
+    exit 1
+  fi
 fi
+
+echo ""
+echo "  To activate the environment in the future, run:"
+echo "    conda activate $CONDA_ENV_NAME"
 
 # ------------------------------------------------------------------------------
 # 4. Check for Aviti adapter files
