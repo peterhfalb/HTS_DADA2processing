@@ -24,17 +24,16 @@ cat("Quality:       ", quality, "\n")
 cat("Taxonomy DB:   ", taxonomy_db, "\n")
 cat("Threads:       ", threads, "\n\n")
 
-# Set working directory to filtered reads location (02_primer_trimmed/)
+# Construct path to filtered reads location (02_primer_trimmed/)
 filtered_dir <- dirname(output_dir)
 filtered_dir <- file.path(dirname(filtered_dir), "02_primer_trimmed")
-setwd(filtered_dir)
 
-cat("Working directory: ", getwd(), "\n\n")
+cat("Filtered reads directory: ", filtered_dir, "\n\n")
 
-# List files
+# List files using absolute paths
 cat("Finding fastq files...\n")
-fnFs <- sort(list.files(".", pattern = "_R1_001.fastq.gz", full.names = TRUE))
-fnRs <- sort(list.files(".", pattern = "_R2_001.fastq.gz", full.names = TRUE))
+fnFs <- sort(list.files(filtered_dir, pattern = "_R1_001.fastq.gz", full.names = TRUE))
+fnRs <- sort(list.files(filtered_dir, pattern = "_R2_001.fastq.gz", full.names = TRUE))
 cat("Found ", length(fnFs), " forward and ", length(fnRs), " reverse reads\n")
 
 if (length(fnFs) == 0 || length(fnRs) == 0) {
