@@ -1,0 +1,9 @@
+name: dada2_processing
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - bioconductor-dada2
+  - r-base>=4.4
+  - cutadapt>=4.0
