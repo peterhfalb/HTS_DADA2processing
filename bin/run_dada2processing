@@ -167,6 +167,8 @@ cat > "$SLURM_SCRIPT" << 'SCRIPT'
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=PLACEHOLDER_EMAIL
 #SBATCH --job-name=dada2_PLACEHOLDER_AMPLICON
+#SBATCH --output=PLACEHOLDER_OUTPUT_DIR/slurm_%j.out
+#SBATCH --error=PLACEHOLDER_OUTPUT_DIR/slurm_%j.err
 
 set -euo pipefail
 
@@ -174,6 +176,7 @@ CONFIG_FILE="PLACEHOLDER_CONFIG"
 LOG_FILE="PLACEHOLDER_LOG"
 PIPELINE_DIR="PLACEHOLDER_PIPELINE_DIR"
 JOBS=PLACEHOLDER_JOBS
+OUTPUT_DIR="PLACEHOLDER_OUTPUT_DIR"
 
 set +u  # Temporarily disable strict mode for conda
 module load conda
@@ -193,6 +196,8 @@ fi
 conda activate $DADA2_ENV
 set -u  # Re-enable strict mode
 
+module load snakemake
+
 snakemake \
   --snakefile "$PIPELINE_DIR/Snakefile" \
   --configfile "$CONFIG_FILE" \
@@ -210,6 +215,7 @@ sed -i.bak "s|PLACEHOLDER_EMAIL|$EMAIL|g" "$SLURM_SCRIPT"
 sed -i.bak "s|PLACEHOLDER_AMPLICON|$AMPLICON|g" "$SLURM_SCRIPT"
 sed -i.bak "s|PLACEHOLDER_CONFIG|$CONFIG_FILE|g" "$SLURM_SCRIPT"
 sed -i.bak "s|PLACEHOLDER_LOG|$LOG_FILE|g" "$SLURM_SCRIPT"
+sed -i.bak "s|PLACEHOLDER_OUTPUT_DIR|$OUTPUT_DIR|g" "$SLURM_SCRIPT"
 sed -i.bak "s|PLACEHOLDER_PIPELINE_DIR|$PIPELINE_DIR|g" "$SLURM_SCRIPT"
 sed -i.bak "s|PLACEHOLDER_JOBS|$JOBS|g" "$SLURM_SCRIPT"
 rm -f "$SLURM_SCRIPT.bak"
