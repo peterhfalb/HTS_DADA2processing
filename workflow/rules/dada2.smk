@@ -49,7 +49,7 @@ rule dada2_readme:
         quality=QUALITY,
     shell:
         """
-        cat > {output} << 'EOF'
+        cat > {output} << EOF
 # DADA2 Denoising and Taxonomy Assignment Results
 ## Directory: 03_dada2/
 
@@ -73,13 +73,13 @@ This directory contains the final DADA2 output including denoised ASVs and taxon
 - `taxID_bootstrap.rds`: Bootstrap confidence values for taxonomy
 
 **Combined Results:**
-- `{amplicon}_combined_sequences_taxa.txt`: Sequence abundance table with taxonomy
-- `{amplicon}_combined_sequences_taxa_bootstrap.txt`: Sequence abundance with taxonomy and bootstrap values
+- `{params.amplicon}_combined_sequences_taxa.txt`: Sequence abundance table with taxonomy
+- `{params.amplicon}_combined_sequences_taxa_bootstrap.txt`: Sequence abundance with taxonomy and bootstrap values
 
 **Processing Details:**
-- Amplicon type: {amplicon}
-- Quality setting: {quality}
-- Filtering: Based on {quality} quality parameters
+- Amplicon type: {params.amplicon}
+- Quality setting: {params.quality}
+- Filtering: Based on {params.quality} quality parameters
 - Dereplication: Yes
 - Denoising: DADA2 with pseudo-pooling
 - Merging: Paired reads merged with minimum overlap and trimming
