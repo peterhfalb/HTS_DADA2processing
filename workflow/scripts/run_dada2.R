@@ -2,15 +2,6 @@
 # DADA2 denoising and taxonomy assignment
 # Usage: Rscript run_dada2.R <output_dir> <amplicon> <quality> <taxonomy_db> <threads>
 
-# Auto-install dada2 if not already present
-if (!require("dada2", quietly = TRUE)) {
-  cat("Installing dada2...\n")
-  if (!require("BiocManager", quietly = TRUE)) {
-    install.packages("BiocManager")
-  }
-  BiocManager::install("dada2")
-}
-
 library(dada2)
 
 # Parse command-line arguments
@@ -287,7 +278,6 @@ if (amplicon == "16S-V4") {
 } else if (amplicon == "18S-AMF") {
   taxa <- assignTaxonomy(seqtab.nochim, taxonomy_db,
     tryRC = TRUE,
-    taxLevels = c("Class", "Order", "Family", "Genus", "Species"),
     multithread = TRUE, outputBootstraps = TRUE
   )
 } else if (amplicon == "18S-V4") {
@@ -295,7 +285,7 @@ if (amplicon == "16S-V4") {
     multithread = TRUE,
     minBoot = 95,
     verbose = TRUE,
-    taxLevels = c("Kingdom", "Supergroup", "Division", "Class", "Order", "Family", "Genus", "Species"),
+    taxLevels = c("Domain", "Supergroup", "Division", "Subdivision", "Class", "Order", "Family", "Genus", "Species"),
     outputBootstraps = TRUE
   )
 }

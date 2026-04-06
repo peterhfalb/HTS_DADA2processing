@@ -175,8 +175,23 @@ LOG_FILE="PLACEHOLDER_LOG"
 PIPELINE_DIR="PLACEHOLDER_PIPELINE_DIR"
 JOBS=PLACEHOLDER_JOBS
 
-module load R/4.4.0-openblas-rocky8
-module load cutadapt/5.0
+set +u  # Temporarily disable strict mode for conda
+module load conda
+CONDA_BASE=$(conda info --base 2>/dev/null) || { echo "ERROR: conda not found"; exit 1; }
+source "$CONDA_BASE/etc/profile.d/conda.sh"
+
+# Create or use existing dada2 conda environment
+DADA2_ENV="dada2_processing_v2"
+if conda env list | grep -q "$DADA2_ENV"; then
+    echo "Using existing $DADA2_ENV environment..."
+else
+    echo "Creating $DADA2_ENV environment (this may take several minutes)..."
+    conda create -n $DADA2_ENV -c bioconda -c conda-forge \
+        bioconductor-dada2 cutadapt r-base -y
+fi
+
+conda activate $DADA2_ENV
+set -u  # Re-enable strict mode
 
 snakemake \
   --snakefile "$PIPELINE_DIR/Snakefile" \
