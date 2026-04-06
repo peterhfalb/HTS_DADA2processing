@@ -25,8 +25,9 @@ cat("Taxonomy DB:   ", taxonomy_db, "\n")
 cat("Threads:       ", threads, "\n\n")
 
 # Construct path to filtered reads location (02_primer_trimmed/)
-filtered_dir <- dirname(output_dir)
-filtered_dir <- file.path(dirname(filtered_dir), "02_primer_trimmed")
+# output_dir is /path/to/FAB2_16S/03_dada2, so parent is /path/to/FAB2_16S
+parent_dir <- dirname(output_dir)
+filtered_dir <- file.path(parent_dir, "02_primer_trimmed")
 
 cat("Filtered reads directory: ", filtered_dir, "\n\n")
 
