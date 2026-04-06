@@ -176,14 +176,13 @@ PIPELINE_DIR="PLACEHOLDER_PIPELINE_DIR"
 JOBS=PLACEHOLDER_JOBS
 
 module load R/4.4.0-openblas-rocky8
+module load cutadapt/5.0
 
 snakemake \
   --snakefile "$PIPELINE_DIR/Snakefile" \
   --configfile "$CONFIG_FILE" \
   --cores $SLURM_NTASKS \
   --jobs $JOBS \
-  --use-conda \
-  --conda-prefix "$PIPELINE_DIR/.snakemake/conda" \
   --rerun-incomplete \
   --printshellcmds \
   2>&1 | tee "$LOG_FILE"

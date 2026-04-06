@@ -25,8 +25,6 @@ rule dada2:
         taxonomy_db=TAXONOMY_DB[AMPLICON],
     log:
         OUTPUT_DIR + "/.logs/dada2.log",
-    conda:
-        "../../envs/dada2.yaml"
     threads: workflow.cores
     shell:
         """

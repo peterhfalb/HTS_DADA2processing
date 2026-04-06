@@ -2,6 +2,15 @@
 # DADA2 denoising and taxonomy assignment
 # Usage: Rscript run_dada2.R <output_dir> <amplicon> <quality> <taxonomy_db> <threads>
 
+# Auto-install dada2 if not already present
+if (!require("dada2", quietly = TRUE)) {
+  cat("Installing dada2...\n")
+  if (!require("BiocManager", quietly = TRUE)) {
+    install.packages("BiocManager")
+  }
+  BiocManager::install("dada2")
+}
+
 library(dada2)
 
 # Parse command-line arguments

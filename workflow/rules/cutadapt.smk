@@ -17,8 +17,6 @@ rule trim_adapters:
         log=OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.log.txt",
     log:
         OUTPUT_DIR + "/.logs/cutadapt_adapter_{sample}.log",
-    conda:
-        "../../envs/dada2.yaml"
     shell:
         """
         mkdir -p $(dirname {output.log})
@@ -87,8 +85,6 @@ rule trim_primers:
         rev_primer=PRIMERS[AMPLICON]["rev"],
     log:
         OUTPUT_DIR + "/.logs/cutadapt_primers_{sample}.log",
-    conda:
-        "../../envs/dada2.yaml"
     shell:
         """
         mkdir -p $(dirname {output.log})
