@@ -16,12 +16,17 @@ Required arguments:
 
 Optional arguments:
   --quality QUALITY         Sequence quality level: good (default) or bad
+  --taxonomy-database DB    Override taxonomy database: SILVA, UNITE, PR2, MaarjAM, EukaryomeSSU, EukaryomeITS
+  --fwd-primer SEQUENCE     Override forward primer for this amplicon (DNA string)
+  --rev-primer SEQUENCE     Override reverse primer for this amplicon (DNA string)
+  --project-name NAME       Project name for output file naming (default: basename of output-dir)
   --jobs JOBS               Max parallel Snakemake jobs (default: 16)
   --help                    Show this help message
 
 Examples:
   run_dada2processing --amplicon 16S-V4 --fastq-dir /mnt/data/raw_fastqs --output-dir /mnt/output/16s_run --email me@umn.edu
   run_dada2processing --amplicon ITS2 --fastq-dir ./fastqs --output-dir ./output --email me@umn.edu --quality bad --jobs 8
+  run_dada2processing --amplicon 16S-V4 --fastq-dir ./fastqs --output-dir ./output --email me@umn.edu --taxonomy-database UNITE --project-name MyProject
 EOF
     exit 1
 }
@@ -33,6 +38,10 @@ AMPLICON=""
 FASTQ_DIR=""
 OUTPUT_DIR=""
 EMAIL=""
+TAXONOMY_DB_OVERRIDE=""
+FWD_PRIMER_OVERRIDE=""
+REV_PRIMER_OVERRIDE=""
+PROJECT_NAME=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -59,6 +68,22 @@ while [[ $# -gt 0 ]]; do
             ;;
         --jobs)
             JOBS="$2"
+            shift 2
+            ;;
+        --taxonomy-database)
+            TAXONOMY_DB_OVERRIDE="$2"
+            shift 2
+            ;;
+        --fwd-primer)
+            FWD_PRIMER_OVERRIDE="$2"
+            shift 2
+            ;;
+        --rev-primer)
+            REV_PRIMER_OVERRIDE="$2"
+            shift 2
+            ;;
+        --project-name)
+            PROJECT_NAME="$2"
             shift 2
             ;;
         --help)
@@ -91,6 +116,16 @@ if [[ "$QUALITY" != "good" && "$QUALITY" != "bad" ]]; then
     exit 1
 fi
 
+# Validate taxonomy database override
+if [[ -n "$TAXONOMY_DB_OVERRIDE" ]]; then
+    valid_dbs=("SILVA" "UNITE" "PR2" "MaarjAM" "EukaryomeSSU" "EukaryomeITS")
+    if [[ ! " ${valid_dbs[@]} " =~ " ${TAXONOMY_DB_OVERRIDE} " ]]; then
+        echo "Error: Invalid taxonomy database '${TAXONOMY_DB_OVERRIDE}'"
+        echo "Valid options: ${valid_dbs[*]}"
+        exit 1
+    fi
+fi
+
 # Check fastq directory exists
 if [[ ! -d "$FASTQ_DIR" ]]; then
     echo "Error: Fastq directory does not exist: $FASTQ_DIR"
@@ -106,6 +141,9 @@ fi
 # Create output directory structure
 mkdir -p "$OUTPUT_DIR"/{00_raw,logs}
 OUTPUT_DIR=$(cd "$OUTPUT_DIR" && pwd)
+
+# Set default project name to output directory basename
+PROJECT_NAME="${PROJECT_NAME:-$(basename "$OUTPUT_DIR")}"
 
 # Detect pipeline root directory
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
@@ -147,6 +185,10 @@ quality: "$QUALITY"
 output_dir: "$OUTPUT_DIR"
 email: "$EMAIL"
 fastq_dir: "$FASTQ_DIR"
+project_name: "$PROJECT_NAME"
+taxonomy_db_override: "$TAXONOMY_DB_OVERRIDE"
+fwd_primer_override: "$FWD_PRIMER_OVERRIDE"
+rev_primer_override: "$REV_PRIMER_OVERRIDE"
 
 samples:
 $(for sample in "${SAMPLES[@]}"; do echo "  - $sample"; done)
@@ -233,6 +275,48 @@ echo "Output:       $OUTPUT_DIR"
 echo "Config:       $CONFIG_FILE"
 echo "SLURM script: $SLURM_SCRIPT"
 echo "Log:          $LOG_FILE"
+echo ""
+echo "Input directory:  $FASTQ_DIR"
+echo "Project name:     $PROJECT_NAME"
+
+# Display taxonomy database
+if [[ -n "$TAXONOMY_DB_OVERRIDE" ]]; then
+    echo "Taxonomy DB:      $TAXONOMY_DB_OVERRIDE (override)"
+else
+    case "$AMPLICON" in
+        16S-V4)  echo "Taxonomy DB:      SILVA (default)" ;;
+        ITS1|ITS2) echo "Taxonomy DB:      UNITE (default)" ;;
+        18S-AMF) echo "Taxonomy DB:      MaarjAM (default)" ;;
+        18S-V4)  echo "Taxonomy DB:      PR2 (default)" ;;
+    esac
+fi
+
+# Display forward primer
+if [[ -n "$FWD_PRIMER_OVERRIDE" ]]; then
+    echo "Fwd primer:       $FWD_PRIMER_OVERRIDE (override)"
+else
+    case "$AMPLICON" in
+        16S-V4)  echo "Fwd primer:       GTGCCAGCMGCCGCGGTAA (default)" ;;
+        ITS1)    echo "Fwd primer:       CTTGGTCATTTAGAGGAAGTAA (default)" ;;
+        ITS2)    echo "Fwd primer:       AACTTTYRRCAAYGGATCWCT (default)" ;;
+        18S-AMF) echo "Fwd primer:       CAGCCGCGGTAATTCCAGCT (default)" ;;
+        18S-V4)  echo "Fwd primer:       TTAAARVGYTCGTAGTYG (default)" ;;
+    esac
+fi
+
+# Display reverse primer
+if [[ -n "$REV_PRIMER_OVERRIDE" ]]; then
+    echo "Rev primer:       $REV_PRIMER_OVERRIDE (override)"
+else
+    case "$AMPLICON" in
+        16S-V4)  echo "Rev primer:       GGACTACHVGGGTWTCTAAT (default)" ;;
+        ITS1)    echo "Rev primer:       GCTGCGTTCTTCATCGATGC (default)" ;;
+        ITS2)    echo "Rev primer:       AGCCTCCGCTTATTGATATGCTTAART (default)" ;;
+        18S-AMF) echo "Rev primer:       GAACCCAAACACTTTGGTTTCC (default)" ;;
+        18S-V4)  echo "Rev primer:       CCGTCAATTHCTTYAART (default)" ;;
+    esac
+fi
+
 echo ""
 echo "Submit job with:"
 echo "  sbatch $SLURM_SCRIPT"

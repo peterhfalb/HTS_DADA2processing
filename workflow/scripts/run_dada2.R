@@ -1,13 +1,13 @@
 #!/usr/bin/env Rscript
 # DADA2 denoising and taxonomy assignment
-# Usage: Rscript run_dada2.R <output_dir> <amplicon> <quality> <taxonomy_db> <threads>
+# Usage: Rscript run_dada2.R <output_dir> <amplicon> <quality> <taxonomy_db> <threads> <project_name> <db_name>
 
 library(dada2)
 
 # Parse command-line arguments
 args <- commandArgs(trailingOnly = TRUE)
-if (length(args) < 5) {
-  stop("Usage: Rscript run_dada2.R <output_dir> <amplicon> <quality> <taxonomy_db> <threads>")
+if (length(args) < 7) {
+  stop("Usage: Rscript run_dada2.R <output_dir> <amplicon> <quality> <taxonomy_db> <threads> <project_name> <db_name>")
 }
 
 output_dir <- args[1]
@@ -15,6 +15,8 @@ amplicon <- args[2]
 quality <- args[3]
 taxonomy_db <- args[4]
 threads <- as.numeric(args[5])
+project_name <- args[6]
+db_name <- args[7]
 
 cat("DADA2 Pipeline\n")
 cat("==============\n")
@@ -22,6 +24,8 @@ cat("Output dir:    ", output_dir, "\n")
 cat("Amplicon type: ", amplicon, "\n")
 cat("Quality:       ", quality, "\n")
 cat("Taxonomy DB:   ", taxonomy_db, "\n")
+cat("Project name:  ", project_name, "\n")
+cat("DB name:       ", db_name, "\n")
 cat("Threads:       ", threads, "\n\n")
 
 # Construct path to filtered reads location (02_primer_trimmed/)
@@ -167,6 +171,10 @@ cat("==============\n")
 errF <- learnErrors(derep_forward, multithread = threads, randomize = TRUE)
 errR <- learnErrors(derep_reverse, multithread = threads, randomize = TRUE)
 
+# Save error models for QC figures
+saveRDS(errF, file.path(output_dir, "errF.rds"))
+saveRDS(errR, file.path(output_dir, "errR.rds"))
+
 cat("DADA2 INFERENCE\n")
 cat("===============\n")
 
@@ -266,49 +274,66 @@ cat("Database:", taxonomy_db, "\n")
 
 seqtab.nochim <- readRDS(file.path(output_dir, "seqtab_nochim.rds"))
 
-# Taxonomy parameters depend on amplicon type
-if (amplicon == "16S-V4") {
-  taxa <- assignTaxonomy(seqtab.nochim, taxonomy_db,
-    multithread = TRUE, outputBootstraps = TRUE
-  )
-} else if (amplicon == "ITS1" || amplicon == "ITS2") {
-  taxa <- assignTaxonomy(seqtab.nochim, taxonomy_db,
-    multithread = TRUE, outputBootstraps = TRUE
-  )
-} else if (amplicon == "18S-AMF") {
-  taxa <- assignTaxonomy(seqtab.nochim, taxonomy_db,
-    tryRC = TRUE,
-    multithread = TRUE, outputBootstraps = TRUE
-  )
-} else if (amplicon == "18S-V4") {
-  taxa <- assignTaxonomy(seqtab.nochim, taxonomy_db,
-    multithread = TRUE,
-    minBoot = 95,
-    verbose = TRUE,
-    taxLevels = c("Domain", "Supergroup", "Division", "Subdivision", "Class", "Order", "Family", "Genus", "Species"),
-    outputBootstraps = TRUE
-  )
-}
+# Determine taxonomy levels: only PR2 uses extended hierarchy
+# All others use standard 7-level Kingdom → Species
+use_extended_levels <- grepl("pr2", taxonomy_db, ignore.case = TRUE)
+tax_levels_standard <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")
+tax_levels_extended <- c("Domain", "Supergroup", "Division", "Subdivision", "Class", "Order", "Family", "Genus", "Species")
+tax_levels <- if (use_extended_levels) tax_levels_extended else tax_levels_standard
+
+# Taxonomy parameters: amplicon-specific flags (tryRC, minBoot)
+use_tryRC <- amplicon %in% c("18S-AMF", "18S-V4")
+use_minBoot <- if (amplicon == "18S-V4") 95 else 50
+
+taxa <- assignTaxonomy(seqtab.nochim, taxonomy_db,
+  multithread = TRUE,
+  outputBootstraps = TRUE,
+  taxLevels = tax_levels,
+  tryRC = use_tryRC,
+  minBoot = use_minBoot,
+  verbose = TRUE
+)
 
 cat("Taxonomy assignment complete\n")
 
-# Save taxonomy
+# Save taxonomy RDS objects
 taxout <- taxa$tax
 bootout <- taxa$boot
 saveRDS(taxout, file = file.path(output_dir, "taxID.rds"))
 saveRDS(bootout, file = file.path(output_dir, "taxID_bootstrap.rds"))
 
-# Combine sequences with taxonomy
-both_boot <- cbind(t(seqtab.nochim), taxa$tax, taxa$boot)
-both_notax <- cbind(t(seqtab.nochim), taxa$tax)
+# Rename bootstrap columns to include "_bootstrap" suffix
+colnames(bootout) <- paste0(colnames(bootout), "_bootstrap")
 
-write.table(both_boot,
-  file = file.path(output_dir, paste0(amplicon, "_combined_sequences_taxa_bootstrap.txt")),
-  sep = "\t", quote = FALSE, col.names = NA
+# Build output tables with ASV as a named column (not rowname)
+asv_seqs <- rownames(taxout)
+
+both_boot <- data.frame(
+  ASV = asv_seqs,
+  as.data.frame(t(seqtab.nochim)),
+  as.data.frame(taxout),
+  as.data.frame(bootout),
+  check.names = FALSE
 )
+
+both_notax <- data.frame(
+  ASV = asv_seqs,
+  as.data.frame(t(seqtab.nochim)),
+  as.data.frame(taxout),
+  check.names = FALSE
+)
+
+# Write output files with new naming convention
+out_file_taxa <- file.path(output_dir, paste0(project_name, "__combined_sequences_ASVtaxa_", db_name, ".txt"))
+out_file_boot <- file.path(output_dir, paste0(project_name, "__combined_sequences_ASVtaxa_bootstrap_", db_name, ".txt"))
+
 write.table(both_notax,
-  file = file.path(output_dir, paste0(amplicon, "_combined_sequences_taxa.txt")),
-  sep = "\t", quote = FALSE, col.names = NA
+  file = out_file_taxa,
+  sep = "\t", quote = FALSE, row.names = FALSE
+)
+write.table(both_boot,
+  file = out_file_boot,
+  sep = "\t", quote = FALSE, row.names = FALSE
 )
 
 cat("\nDone.\n")

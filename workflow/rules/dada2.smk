@@ -16,13 +16,17 @@ rule dada2:
         summary=OUTPUT_DIR + "/03_dada2/sequence_process_summary.txt",
         taxa=OUTPUT_DIR + "/03_dada2/taxID.rds",
         taxa_boot=OUTPUT_DIR + "/03_dada2/taxID_bootstrap.rds",
-        combined_taxa=OUTPUT_DIR + f"/03_dada2/{AMPLICON}_combined_sequences_taxa.txt",
-        combined_taxa_boot=OUTPUT_DIR + f"/03_dada2/{AMPLICON}_combined_sequences_taxa_bootstrap.txt",
+        errF=OUTPUT_DIR + "/03_dada2/errF.rds",
+        errR=OUTPUT_DIR + "/03_dada2/errR.rds",
+        combined_taxa=OUTPUT_DIR + f"/03_dada2/{PROJECT_NAME}__combined_sequences_ASVtaxa_{DB_NAME}.txt",
+        combined_taxa_boot=OUTPUT_DIR + f"/03_dada2/{PROJECT_NAME}__combined_sequences_ASVtaxa_bootstrap_{DB_NAME}.txt",
     params:
         outdir=OUTPUT_DIR + "/03_dada2",
         amplicon=AMPLICON,
         quality=QUALITY,
-        taxonomy_db=TAXONOMY_DB[AMPLICON],
+        taxonomy_db=EFFECTIVE_TAXONOMY_DB,
+        project_name=PROJECT_NAME,
+        db_name=DB_NAME,
     log:
         OUTPUT_DIR + "/.logs/dada2.log",
     threads: workflow.cores
@@ -35,6 +39,8 @@ rule dada2:
           {params.quality} \
           {params.taxonomy_db} \
           {threads} \
+          {params.project_name} \
+          {params.db_name} \
           2>&1 | tee {log}
         """
 
@@ -87,4 +93,33 @@ This directory contains the final DADA2 output including denoised ASVs and taxon
 ### Next Steps:
 Use the combined_sequences_taxa.txt files for downstream analysis (diversity, relative abundance, etc.)
 EOF
+        """
+
+rule dada2_qc:
+    """Generate QC stats file and figures"""
+    input:
+        dada2_summary = OUTPUT_DIR + "/03_dada2/sequence_process_summary.txt",
+        errF          = OUTPUT_DIR + "/03_dada2/errF.rds",
+        errR          = OUTPUT_DIR + "/03_dada2/errR.rds",
+        seqtab_nochim = OUTPUT_DIR + "/03_dada2/seqtab_nochim.rds",
+        adapter_logs  = expand(OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.log.txt", sample=SAMPLES),
+        primer_logs   = expand(OUTPUT_DIR + "/02_primer_trimmed/02_logs/cutadapt.{sample}.log.txt", sample=SAMPLES),
+        primer_fqs    = expand(OUTPUT_DIR + "/02_primer_trimmed/{sample}_L001_R1_001.fastq.gz", sample=SAMPLES),
+    output:
+        qc_summary = OUTPUT_DIR + "/04_QC/qc_summary.txt",
+    params:
+        outdir    = OUTPUT_DIR + "/04_QC",
+        amplicon  = AMPLICON,
+        dada2_dir = OUTPUT_DIR + "/03_dada2",
+        primer_trimmed_dir = OUTPUT_DIR + "/02_primer_trimmed",
+    log:
+        OUTPUT_DIR + "/.logs/qc.log",
+    shell:
+        """
+        mkdir -p {params.outdir}/figures
+        Rscript workflow/scripts/qc_figures.R \
+          {params.outdir} {params.amplicon} \
+          {input.dada2_summary} {params.dada2_dir} \
+          {params.primer_trimmed_dir} \
+          2>&1 | tee {log}
         """

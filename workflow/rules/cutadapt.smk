@@ -81,8 +81,8 @@ rule trim_primers:
         r2=OUTPUT_DIR + "/02_primer_trimmed/{sample}_L001_R2_001.fastq.gz",
         log=OUTPUT_DIR + "/02_primer_trimmed/02_logs/cutadapt.{sample}.log.txt",
     params:
-        fwd_primer=PRIMERS[AMPLICON]["fwd"],
-        rev_primer=PRIMERS[AMPLICON]["rev"],
+        fwd_primer=EFFECTIVE_FWD,
+        rev_primer=EFFECTIVE_REV,
     log:
         OUTPUT_DIR + "/.logs/cutadapt_primers_{sample}.log",
     shell:
