@@ -171,6 +171,22 @@ snakemake --dag --configfile <output_dir>/config.yaml | dot -Tpdf > dag.pdf
 | 18S-AMF | 10 | **Yes** |
 | 18S-V4 | 10 | No |
 
+#### ⚠️ 18S-V4 Read Merging
+
+**18S-V4 datasets often have poor reverse read quality**, which can result in low merge rates. Monitor the merge rate in the QC summary:
+- **Merge rate >70%**: Normal, proceed as usual
+- **Merge rate 50-70%**: Acceptable, but expect some data loss
+- **Merge rate <50%**: Consider using **forward reads only**
+
+To use forward reads only, modify `workflow/scripts/run_dada2.R` line 195 to set `justConcatenate=TRUE`:
+```r
+merged_amplicons <- mergePairs(dadaFs, derep_forward, dadaRs, derep_reverse,
+  trimOverhang=TRUE, minOverlap=10, justConcatenate=TRUE  # <-- Add this
+)
+```
+
+This concatenates R1+R2 without requiring overlap, preserving all data but sacrificing merge-based quality control.
+
 ### Taxonomy Database
 
 Stored on MSI Agate at `/projects/standard/kennedyp/shared/taxonomy/`:

@@ -245,6 +245,24 @@ def main():
         PRIMER_REV.get(name) == expected_rev and data["pct"] > 80 for name, data in rev_results.items()
     )
 
+    # Special note for 18S-V4
+    if amplicon == "18S-V4":
+        print()
+        print("⚠️  NOTE: 18S-V4 DATASETS")
+        print("-" * 50)
+        print("18S-V4 reverse reads (R2) are known to have quality issues:")
+        print("  - Lower quality compared to forward reads")
+        print("  - Inconsistent reverse primer binding")
+        print("  - Variable primer trimming efficiency")
+        print()
+        print("If reverse primer matching is <80% or scattered across multiple")
+        print("primers, this is expected behavior and does NOT indicate a problem.")
+        print()
+        print("⚠️  IMPORTANT: Check the merge rate in QC stats!")
+        print("If merge rate is very poor (<50%), consider using forward reads only")
+        print("(set justConcatenate=TRUE) rather than attempting to merge.")
+        print()
+
     if expected_fwd_found and expected_rev_found:
         print("✓ Both expected primers detected at >80% frequency. Good!")
     elif expected_fwd_found or expected_rev_found:
