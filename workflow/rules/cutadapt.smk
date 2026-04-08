@@ -39,6 +39,7 @@ rule trim_adapters:
         r1=OUTPUT_DIR + "/01_adapter/{sample}_R1_001.fastq.gz",
         r2=OUTPUT_DIR + "/01_adapter/{sample}_R2_001.fastq.gz",
         log=OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.log.txt",
+        json=OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.json",
     log:
         OUTPUT_DIR + "/.logs/cutadapt_adapter_{sample}.log",
     shell:
@@ -48,6 +49,7 @@ rule trim_adapters:
           -a TATGGTAATTGTGTGNCAGCNGCCGCGGTAA \
           -g ATTAGANACCCNNGTAGTCCGGCTGGCTGACT \
           -A AGTCAGCCAGCCGGACTACNVGGGTNTCTAAT \
+          --json={output.json} \
           -o {output.r1} \
           -p {output.r2} \
           {input.r1} {input.r2} \
@@ -104,6 +106,7 @@ rule trim_primers:
         r1=OUTPUT_DIR + "/02_primer_trimmed/{sample}_R1_001.fastq.gz",
         r2=OUTPUT_DIR + "/02_primer_trimmed/{sample}_R2_001.fastq.gz",
         log=OUTPUT_DIR + "/02_primer_trimmed/02_logs/cutadapt.{sample}.log.txt",
+        json=OUTPUT_DIR + "/02_primer_trimmed/02_logs/cutadapt.{sample}.json",
     params:
         fwd_primer=EFFECTIVE_FWD,
         rev_primer=EFFECTIVE_REV,
@@ -115,6 +118,7 @@ rule trim_primers:
         cutadapt --cores 4 --pair-filter=any --minimum-length 100 --discard-untrimmed \
           -g {params.fwd_primer} \
           -G {params.rev_primer} \
+          --json={output.json} \
           -o {output.r1} \
           -p {output.r2} \
           {input.r1} {input.r2} \

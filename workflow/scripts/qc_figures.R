@@ -3,6 +3,7 @@
 # Usage: Rscript qc_figures.R <qc_outdir> <amplicon> <dada2_summary_path> <dada2_dir> <primer_trimmed_dir>
 
 library(dada2)
+library(jsonlite)
 
 # Parse command-line arguments
 args <- commandArgs(trailingOnly = TRUE)
@@ -28,53 +29,53 @@ cat("Primer-trimmed dir:   ", primer_trimmed_dir, "\n\n")
 dir.create(file.path(qc_outdir, "figures"), showWarnings = FALSE, recursive = TRUE)
 
 # ==============================================================================
-# PARSE CUTADAPT LOGS
+# PARSE CUTADAPT JSON FILES
 # ==============================================================================
-cat("Parsing cutadapt logs...\n")
+cat("Parsing cutadapt JSON files...\n")
 
-parse_cutadapt_log <- function(log_path) {
+parse_cutadapt_json <- function(json_path) {
   tryCatch({
-    lines <- readLines(log_path)
+    data <- jsonlite::fromJSON(json_path)
 
-    # Extract total read pairs processed
-    total_line <- lines[grepl("Total read pairs processed", lines)]
-    if (length(total_line) == 0) return(list(input = NA, passing = NA))
+    # Extract read counts
+    total_reads <- data$read_counts$input
+    reads_with_adapter_r1 <- data$read_counts$read1_with_adapter
+    reads_with_adapter_r2 <- data$read_counts$read2_with_adapter
+    output_reads <- data$read_counts$output
 
-    total <- as.integer(gsub("[^0-9]", "", strsplit(total_line, ":", fixed = TRUE)[[1]][2]))
-
-    # Extract passing read pairs
-    passing_line <- lines[grepl("Pairs written.*passing", lines)]
-    if (length(passing_line) == 0) return(list(input = total, passing = NA))
-
-    passing_str <- strsplit(passing_line, ":", fixed = TRUE)[[1]][2]
-    passing <- as.integer(gsub("[^0-9]", "", strsplit(passing_str, " ", fixed = TRUE)[[1]][1]))
-
-    list(input = total, passing = passing)
+    list(
+      input = total_reads,
+      output = output_reads,
+      r1_with_adapter = reads_with_adapter_r1,
+      r2_with_adapter = reads_with_adapter_r2,
+      pct_r1 = 100 * reads_with_adapter_r1 / total_reads if (!is.null(reads_with_adapter_r1)) else NA,
+      pct_r2 = 100 * reads_with_adapter_r2 / total_reads if (!is.null(reads_with_adapter_r2)) else NA
+    )
   }, error = function(e) {
-    cat("Warning: could not parse log", log_path, "\n")
-    list(input = NA, passing = NA)
+    cat("Warning: could not parse JSON", json_path, "\n")
+    list(input = NA, output = NA, r1_with_adapter = NA, r2_with_adapter = NA, pct_r1 = NA, pct_r2 = NA)
   })
 }
 
-# Parse adapter logs
-adapter_log_dir <- file.path(dirname(dirname(primer_trimmed_dir)), "01_adapter", "01_logs")
-adapter_logs <- list.files(adapter_log_dir, pattern = "^cutadapt\\..*\\.log\\.txt$", full.names = TRUE)
+# Parse adapter JSONs
+adapter_json_dir <- file.path(dirname(dirname(primer_trimmed_dir)), "01_adapter", "01_logs")
+adapter_jsons <- list.files(adapter_json_dir, pattern = "^cutadapt\\..*\\.json$", full.names = TRUE)
 
 adapter_stats <- list()
-for (log_file in adapter_logs) {
-  sample_name <- sub("^cutadapt\\.", "", sub("\\.log\\.txt$", "", basename(log_file)))
-  stats <- parse_cutadapt_log(log_file)
+for (json_file in adapter_jsons) {
+  sample_name <- sub("^cutadapt\\.", "", sub("\\.json$", "", basename(json_file)))
+  stats <- parse_cutadapt_json(json_file)
   adapter_stats[[sample_name]] <- stats
 }
 
-# Parse primer logs
-primer_log_dir <- file.path(primer_trimmed_dir, "02_logs")
-primer_logs <- list.files(primer_log_dir, pattern = "^cutadapt\\..*\\.log\\.txt$", full.names = TRUE)
+# Parse primer JSONs
+primer_json_dir <- file.path(primer_trimmed_dir, "02_logs")
+primer_jsons <- list.files(primer_json_dir, pattern = "^cutadapt\\..*\\.json$", full.names = TRUE)
 
 primer_stats <- list()
-for (log_file in primer_logs) {
-  sample_name <- sub("^cutadapt\\.", "", sub("\\.log\\.txt$", "", basename(log_file)))
-  stats <- parse_cutadapt_log(log_file)
+for (json_file in primer_jsons) {
+  sample_name <- sub("^cutadapt\\.", "", sub("\\.json$", "", basename(json_file)))
+  stats <- parse_cutadapt_json(json_file)
   primer_stats[[sample_name]] <- stats
 }
 
@@ -96,21 +97,37 @@ qc_df <- data.frame(row.names = sample_names)
 
 # Add adapter stats
 qc_df$adapter_input <- NA
+qc_df$adapter_r1_detected <- NA
+qc_df$adapter_r1_pct <- NA
+qc_df$adapter_r2_detected <- NA
+qc_df$adapter_r2_pct <- NA
 qc_df$adapter_passing <- NA
 for (sname in sample_names) {
   if (sname %in% names(adapter_stats)) {
     qc_df[sname, "adapter_input"] <- adapter_stats[[sname]]$input
-    qc_df[sname, "adapter_passing"] <- adapter_stats[[sname]]$passing
+    qc_df[sname, "adapter_r1_detected"] <- adapter_stats[[sname]]$r1_with_adapter
+    qc_df[sname, "adapter_r1_pct"] <- adapter_stats[[sname]]$pct_r1
+    qc_df[sname, "adapter_r2_detected"] <- adapter_stats[[sname]]$r2_with_adapter
+    qc_df[sname, "adapter_r2_pct"] <- adapter_stats[[sname]]$pct_r2
+    qc_df[sname, "adapter_passing"] <- adapter_stats[[sname]]$output
   }
 }
 
 # Add primer stats
 qc_df$primer_input <- NA
+qc_df$primer_r1_detected <- NA
+qc_df$primer_r1_pct <- NA
+qc_df$primer_r2_detected <- NA
+qc_df$primer_r2_pct <- NA
 qc_df$primer_passing <- NA
 for (sname in sample_names) {
   if (sname %in% names(primer_stats)) {
     qc_df[sname, "primer_input"] <- primer_stats[[sname]]$input
-    qc_df[sname, "primer_passing"] <- primer_stats[[sname]]$passing
+    qc_df[sname, "primer_r1_detected"] <- primer_stats[[sname]]$r1_with_adapter
+    qc_df[sname, "primer_r1_pct"] <- primer_stats[[sname]]$pct_r1
+    qc_df[sname, "primer_r2_detected"] <- primer_stats[[sname]]$r2_with_adapter
+    qc_df[sname, "primer_r2_pct"] <- primer_stats[[sname]]$pct_r2
+    qc_df[sname, "primer_passing"] <- primer_stats[[sname]]$output
   }
 }
 
@@ -143,12 +160,20 @@ cat("# QC Summary - DADA2 Pipeline\n")
 cat("# Generated: ", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
 cat("# Amplicon: ", amplicon, "\n")
 cat("#\n")
+cat("# COLUMN DESCRIPTIONS:\n")
+cat("#   adapter_r*_pct:   % of R reads with Illumina adapter detected\n")
+cat("#   primer_r*_pct:    % of R reads with amplicon primer detected\n")
+cat("#   dada2_*:          DADA2 denoising results\n")
+cat("#   merge_pct:        % of reads that successfully merged\n")
+cat("#   chimera_pct:      % of merged reads retained after chimera removal\n")
+cat("#\n")
 cat("# EXPECTED VALUES (approximate):\n")
-cat("#   adapter_retention:    typically 85-98% (low = adapter contamination or poor quality)\n")
-cat("#   primer_retention:     typically 70-95% (low = wrong primer or orientation issues)\n")
-cat("#   dada2_filter:         typically 70-85% (< 50% suggests quality problems)\n")
-cat("#   merge_rate:           typically 75-95% (low = insufficient overlap or high error rate)\n")
-cat("#   chimera_removal:      typically 85-98% remaining (> 15% chimeric = concern)\n")
+cat("#   adapter_r1/r2_pct:    typically 85-98% (low = adapter contamination or poor quality)\n")
+cat("#   primer_r1/r2_pct:     typically 70-95% (low = wrong primer or orientation issues)\n")
+cat("#                         For 18S-V4, expect R2 primer %% to be lower (50-70%)\n")
+cat("#   dada2_filter_pct:     typically 70-85% (< 50% suggests quality problems)\n")
+cat("#   merge_pct:            16S: 75-95%, ITS: 60-85%, 18S-V4: 30-70% (lower R2 quality)\n")
+cat("#   chimera_pct:          typically 85-98% remaining (> 15% chimeric = concern)\n")
 cat("#\n")
 
 sink()
@@ -177,18 +202,16 @@ primer_fqs_rev <- sort(list.files(primer_trimmed_dir, pattern = "_R2_001.fastq.g
 n_samples <- min(3, length(primer_fqs_fwd))
 if (n_samples > 0) {
   tryCatch({
-    pdf(file.path(qc_outdir, "figures", "quality_profile_fwd.pdf"), width = 10, height = 6)
-    plotQualityProfile(primer_fqs_fwd[1:n_samples])
-    dev.off()
+    p <- plotQualityProfile(primer_fqs_fwd[1:n_samples])
+    ggsave(file.path(qc_outdir, "figures", "quality_profile_fwd.pdf"), plot = p, width = 12, height = 7)
     cat("  quality_profile_fwd.pdf\n")
   }, error = function(e) {
     cat("  Warning: could not generate quality_profile_fwd.pdf:", e$message, "\n")
   })
 
   tryCatch({
-    pdf(file.path(qc_outdir, "figures", "quality_profile_rev.pdf"), width = 10, height = 6)
-    plotQualityProfile(primer_fqs_rev[1:n_samples])
-    dev.off()
+    p <- plotQualityProfile(primer_fqs_rev[1:n_samples])
+    ggsave(file.path(qc_outdir, "figures", "quality_profile_rev.pdf"), plot = p, width = 12, height = 7)
     cat("  quality_profile_rev.pdf\n")
   }, error = function(e) {
     cat("  Warning: could not generate quality_profile_rev.pdf:", e$message, "\n")
@@ -202,18 +225,16 @@ errF <- readRDS(file.path(dada2_dir, "errF.rds"))
 errR <- readRDS(file.path(dada2_dir, "errR.rds"))
 
 tryCatch({
-  pdf(file.path(qc_outdir, "figures", "error_model_fwd.pdf"), width = 10, height = 6)
-  plotErrors(errF, nominalQ = TRUE)
-  dev.off()
+  p <- plotErrors(errF, nominalQ = TRUE)
+  ggsave(file.path(qc_outdir, "figures", "error_model_fwd.pdf"), plot = p, width = 12, height = 7)
   cat("  error_model_fwd.pdf\n")
 }, error = function(e) {
   cat("  Warning: could not generate error_model_fwd.pdf:", e$message, "\n")
 })
 
 tryCatch({
-  pdf(file.path(qc_outdir, "figures", "error_model_rev.pdf"), width = 10, height = 6)
-  plotErrors(errR, nominalQ = TRUE)
-  dev.off()
+  p <- plotErrors(errR, nominalQ = TRUE)
+  ggsave(file.path(qc_outdir, "figures", "error_model_rev.pdf"), plot = p, width = 12, height = 7)
   cat("  error_model_rev.pdf\n")
 }, error = function(e) {
   cat("  Warning: could not generate error_model_rev.pdf:", e$message, "\n")
@@ -238,27 +259,43 @@ tryCatch({
 cat("Generating read tracking figure...\n")
 
 tryCatch({
+  library(ggplot2)
+
   # Calculate mean reads at each step
   steps <- c("adapter_input", "adapter_passing", "primer_passing", "dada2_input", "filtered", "merged", "nonchim")
-  step_data <- matrix(NA, nrow = length(sample_names), ncol = length(steps))
+  step_data <- data.frame()
 
-  for (i in seq_along(steps)) {
-    if (steps[i] %in% colnames(qc_df)) {
-      step_data[, i] <- qc_df[sample_names, steps[i]]
+  for (step in steps) {
+    if (step %in% colnames(qc_df)) {
+      means <- mean(qc_df[[step]], na.rm = TRUE)
+    } else {
+      means <- NA
     }
+    step_data <- rbind(step_data, data.frame(step = step, mean_reads = means))
   }
 
-  # Use mean reads for visualization
-  mean_reads <- colMeans(step_data, na.rm = TRUE)
+  # Remove NAs
+  step_data <- step_data[!is.na(step_data$mean_reads), ]
 
-  pdf(file.path(qc_outdir, "figures", "read_tracking.pdf"), width = 12, height = 6)
+  # Create ggplot with better spacing
+  p <- ggplot(step_data, aes(x = factor(step, levels = step), y = mean_reads, fill = step)) +
+    geom_bar(stat = "identity", color = "black", size = 0.7) +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 11, margin = margin(t = 10)),
+      axis.text.y = element_text(size = 11, margin = margin(r = 10)),
+      axis.title = element_text(size = 12, margin = margin(t = 10, r = 10)),
+      plot.title = element_text(size = 14, hjust = 0.5, margin = margin(b = 15)),
+      legend.position = "none"
+    ) +
+    labs(
+      title = "Mean Reads per Sample at Each Pipeline Step",
+      x = "Pipeline Step",
+      y = "Mean Number of Reads"
+    ) +
+    scale_fill_brewer(palette = "Set3")
 
-  # Create barplot with proper colors
-  colors <- rainbow(length(steps))
-  barplot(mean_reads, names.arg = steps, main = "Mean Reads per Sample at Each Pipeline Step",
-    ylab = "Mean Number of Reads", xlab = "Pipeline Step", col = colors, las = 2, cex.names = 0.8)
-
-  dev.off()
+  ggsave(file.path(qc_outdir, "figures", "read_tracking.pdf"), plot = p, width = 12, height = 7)
   cat("  read_tracking.pdf\n")
 }, error = function(e) {
   cat("  Warning: could not generate read_tracking.pdf:", e$message, "\n")

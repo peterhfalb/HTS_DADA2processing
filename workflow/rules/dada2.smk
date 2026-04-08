@@ -102,6 +102,8 @@ rule dada2_qc:
         errF          = OUTPUT_DIR + "/03_dada2/errF.rds",
         errR          = OUTPUT_DIR + "/03_dada2/errR.rds",
         seqtab_nochim = OUTPUT_DIR + "/03_dada2/seqtab_nochim.rds",
+        adapter_jsons = expand(OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.json", sample=SAMPLES),
+        primer_jsons  = expand(OUTPUT_DIR + "/02_primer_trimmed/02_logs/cutadapt.{sample}.json", sample=SAMPLES),
         adapter_logs  = expand(OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.log.txt", sample=SAMPLES),
         primer_logs   = expand(OUTPUT_DIR + "/02_primer_trimmed/02_logs/cutadapt.{sample}.log.txt", sample=SAMPLES),
         primer_fqs    = expand(OUTPUT_DIR + "/02_primer_trimmed/{sample}_R1_001.fastq.gz", sample=SAMPLES),
