@@ -264,6 +264,40 @@ rm -f "$SLURM_SCRIPT.bak"
 
 chmod +x "$SLURM_SCRIPT"
 
+# ==============================================================================
+# PRIMER VALIDATION CHECK
+# ==============================================================================
+echo ""
+echo "=========================================="
+echo "PRIMER VALIDATION"
+echo "=========================================="
+echo ""
+
+# Determine which primers to validate
+VALIDATE_FWD="${FWD_PRIMER_OVERRIDE:-$(
+  case "$AMPLICON" in
+    16S-V4)  echo "GTGYCAGCMGCCGCGGTAA" ;;
+    ITS1)    echo "CTTGGTCATTTAGAGGAAGTAA" ;;
+    ITS2)    echo "TCGATGAAGAACGCAGCG" ;;
+    18S-AMF) echo "CAGCCGCGGTAATTCCAGCT" ;;
+    18S-V4)  echo "TTAAARVGYTCGTAGTYG" ;;
+  esac
+)}"
+
+VALIDATE_REV="${REV_PRIMER_OVERRIDE:-$(
+  case "$AMPLICON" in
+    16S-V4)  echo "GGACTACNVGGGTWTCTAAT" ;;
+    ITS1)    echo "GCTGCGTTCTTCATCGATGC" ;;
+    ITS2)    echo "TCCTCCGCTTATTGATATGC" ;;
+    18S-AMF) echo "GAACCCAAACACTTTGGTTTCC" ;;
+    18S-V4)  echo "CCGTCAATTHCTTYAART" ;;
+  esac
+)}"
+
+# Run primer check
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+Rscript "$SCRIPT_DIR/check_primers.R" "$FASTQ_DIR" "$VALIDATE_FWD" "$VALIDATE_REV" "$AMPLICON"
+
 echo ""
 echo "=========================================="
 echo "DADA2 Pipeline Ready"
@@ -296,9 +330,9 @@ if [[ -n "$FWD_PRIMER_OVERRIDE" ]]; then
     echo "Fwd primer:       $FWD_PRIMER_OVERRIDE (override)"
 else
     case "$AMPLICON" in
-        16S-V4)  echo "Fwd primer:       GTGCCAGCMGCCGCGGTAA (default)" ;;
+        16S-V4)  echo "Fwd primer:       GTGYCAGCMGCCGCGGTAA (default)" ;;
         ITS1)    echo "Fwd primer:       CTTGGTCATTTAGAGGAAGTAA (default)" ;;
-        ITS2)    echo "Fwd primer:       AACTTTYRRCAAYGGATCWCT (default)" ;;
+        ITS2)    echo "Fwd primer:       TCGATGAAGAACGCAGCG (default)" ;;
         18S-AMF) echo "Fwd primer:       CAGCCGCGGTAATTCCAGCT (default)" ;;
         18S-V4)  echo "Fwd primer:       TTAAARVGYTCGTAGTYG (default)" ;;
     esac
@@ -309,9 +343,9 @@ if [[ -n "$REV_PRIMER_OVERRIDE" ]]; then
     echo "Rev primer:       $REV_PRIMER_OVERRIDE (override)"
 else
     case "$AMPLICON" in
-        16S-V4)  echo "Rev primer:       GGACTACHVGGGTWTCTAAT (default)" ;;
+        16S-V4)  echo "Rev primer:       GGACTACNVGGGTWTCTAAT (default)" ;;
         ITS1)    echo "Rev primer:       GCTGCGTTCTTCATCGATGC (default)" ;;
-        ITS2)    echo "Rev primer:       AGCCTCCGCTTATTGATATGCTTAART (default)" ;;
+        ITS2)    echo "Rev primer:       TCCTCCGCTTATTGATATGC (default)" ;;
         18S-AMF) echo "Rev primer:       GAACCCAAACACTTTGGTTTCC (default)" ;;
         18S-V4)  echo "Rev primer:       CCGTCAATTHCTTYAART (default)" ;;
     esac

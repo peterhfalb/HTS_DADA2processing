@@ -110,6 +110,7 @@ if (amplicon == "16S-V4") {
       maxN = 0,
       maxEE = c(4, 4),
       minLen = 50,
+      truncLen=c(240,175),
       truncQ = 2,
       rm.phix = TRUE,
       compress = TRUE,
@@ -193,11 +194,11 @@ if (amplicon == "16S-V4") {
   )
 } else if (amplicon == "ITS1" || amplicon == "ITS2") {
   merged_amplicons <- mergePairs(dadaFs, derep_forward, dadaRs, derep_reverse,
-    trimOverhang = TRUE, minOverlap = 50
+    trimOverhang = TRUE, minOverlap = 10
   )
 } else if (amplicon == "18S-AMF") {
   merged_amplicons <- mergePairs(dadaFs, derep_forward, dadaRs, derep_reverse,
-    trimOverhang = TRUE, minOverlap = 10, justConcatenate = TRUE
+    trimOverhang = TRUE, minOverlap = 10
   )
 } else if (amplicon == "18S-V4") {
   merged_amplicons <- mergePairs(dadaFs, derep_forward, dadaRs, derep_reverse,
@@ -214,19 +215,6 @@ cat("===========================\n")
 seqtab <- makeSequenceTable(merged_amplicons)
 cat("Dimensions:", dim(seqtab), "\n")
 saveRDS(seqtab, file.path(output_dir, "seqtab.rds"))
-
-# Length filtering for 18S amplicons only
-if (amplicon == "18S-AMF" || amplicon == "18S-V4") {
-  cat("\nLENGTH FILTERING (18S only)\n")
-  cat("===========================\n")
-  MINLEN <- 400
-  MAXLEN <- 600
-  seqlens <- nchar(colnames(seqtab))
-  cat("Filtering sequences between", MINLEN, "and", MAXLEN, "bp\n")
-  seqtab.filt <- seqtab[, seqlens >= MINLEN & seqlens <= MAXLEN]
-  cat("Dimensions after length filter:", dim(seqtab.filt), "\n")
-  seqtab <- seqtab.filt
-}
 
 cat("\nCHIMERA REMOVAL\n")
 cat("===============\n")
@@ -283,7 +271,7 @@ tax_levels <- if (use_extended_levels) tax_levels_extended else tax_levels_stand
 
 # Taxonomy parameters: amplicon-specific flags (tryRC, minBoot)
 use_tryRC <- amplicon %in% c("18S-AMF", "18S-V4")
-use_minBoot <- if (amplicon == "18S-V4") 95 else 50
+use_minBoot <- 50
 
 taxa <- assignTaxonomy(seqtab.nochim, taxonomy_db,
   multithread = TRUE,

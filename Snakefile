@@ -27,16 +27,16 @@ REV_PRIMER_OVERRIDE = config.get("rev_primer_override", "")
 # Primer sequences (forward and reverse) per amplicon type
 PRIMERS = {
     "16S-V4": {
-        "fwd": "GTGCCAGCMGCCGCGGTAA",
-        "rev": "GGACTACHVGGGTWTCTAAT",
+        "fwd": "GTGYCAGCMGCCGCGGTAA",
+        "rev": "GGACTACNVGGGTWTCTAAT",
     },
     "ITS1": {
         "fwd": "CTTGGTCATTTAGAGGAAGTAA",
         "rev": "GCTGCGTTCTTCATCGATGC",
     },
     "ITS2": {
-        "fwd": "AACTTTYRRCAAYGGATCWCT",
-        "rev": "AGCCTCCGCTTATTGATATGCTTAART",
+        "fwd": "TCGATGAAGAACGCAGCG",
+        "rev": "TCCTCCGCTTATTGATATGC",
     },
     "18S-AMF": {
         "fwd": "CAGCCGCGGTAATTCCAGCT",
