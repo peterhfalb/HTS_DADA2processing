@@ -273,12 +273,13 @@ echo "PRIMER VALIDATION"
 echo "=========================================="
 echo ""
 
-# Load R module (required for primer validation)
+# Load required modules for primer validation
 set +u  # Temporarily disable strict mode for module loading
-module load R 2>/dev/null || {
-  echo "ERROR: Could not load R module. Primer validation requires R."
-  echo "Please check that the R module is available on this system."
-  exit 1
+module load python cutadapt 2>/dev/null || {
+  # If modules don't load, try conda-based approach
+  echo "Note: Could not load python/cutadapt modules directly."
+  echo "      Loading conda to access cutadapt..."
+  module load conda || { echo "ERROR: Could not load conda module"; exit 1; }
 }
 set -u  # Re-enable strict mode
 
@@ -303,9 +304,16 @@ VALIDATE_REV="${REV_PRIMER_OVERRIDE:-$(
   esac
 )}"
 
-# Run primer check
+# Run primer check using cutadapt
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-Rscript "$SCRIPT_DIR/check_primers.R" "$FASTQ_DIR" "$VALIDATE_FWD" "$VALIDATE_REV" "$AMPLICON"
+python3 "$SCRIPT_DIR/check_primers_cutadapt.py" "$FASTQ_DIR" "$VALIDATE_FWD" "$VALIDATE_REV" "$AMPLICON" || {
+  echo ""
+  echo "ERROR: Primer validation failed"
+  echo "Please check that:"
+  echo "  1. Python and cutadapt are available (module load cutadapt)"
+  echo "  2. FASTQ files exist in $FASTQ_DIR"
+  exit 1
+}
 
 echo ""
 echo "=========================================="
