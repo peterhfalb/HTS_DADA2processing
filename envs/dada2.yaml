@@ -1,4 +1,4 @@
-name: dada2_processing
+name: dada2_processing_v2
 channels:
   - bioconda
   - conda-forge
@@ -7,3 +7,5 @@ dependencies:
   - bioconductor-dada2
   - r-base>=4.4
   - cutadapt>=4.0
+  - r-jsonlite
+  - r-ggplot2
