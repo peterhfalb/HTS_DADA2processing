@@ -126,6 +126,11 @@ def run_cutadapt_primer_search(r1_file, r2_file, primers_dict, is_reverse=False)
             matches = adapter_info["matches"]
             results[name] = {"matches": matches, "pct": 100 * matches / total_reads if total_reads > 0 else 0}
 
+        # Debug: print full JSON if no adapters found
+        if not results:
+            print(f"DEBUG: No adapters found in JSON. Full JSON structure:", file=sys.stderr)
+            print(json.dumps(data, indent=2), file=sys.stderr)
+
         return results, total_reads
 
 
