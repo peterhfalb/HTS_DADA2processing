@@ -206,9 +206,9 @@ PIPELINE_DIR="PLACEHOLDER_PIPELINE_DIR"
 JOBS=PLACEHOLDER_JOBS
 OUTPUT_DIR="PLACEHOLDER_OUTPUT_DIR"
 
-set +u  # Temporarily disable strict mode for conda
-module load conda
-CONDA_BASE=$(conda info --base 2>/dev/null) || { echo "ERROR: conda not found"; exit 1; }
+set +u  # Temporarily disable strict mode for conda/mamba
+module load miniforge/24.3
+CONDA_BASE=$(conda info --base 2>/dev/null) || { echo "ERROR: miniforge not found"; exit 1; }
 source "$CONDA_BASE/etc/profile.d/conda.sh"
 
 # Create or use existing dada2 conda environment
@@ -268,12 +268,14 @@ echo ""
 
 # Load required modules for primer validation
 set +u  # Temporarily disable strict mode for module loading
-module load python cutadapt 2>/dev/null || {
-  # If modules don't load, try conda-based approach
-  echo "Note: Could not load python/cutadapt modules directly."
-  echo "      Loading conda to access cutadapt..."
-  module load conda || { echo "ERROR: Could not load conda module"; exit 1; }
-}
+# Try to use miniforge first (has python and cutadapt)
+if ! module load miniforge/24.3 2>/dev/null; then
+  # Fallback to python/cutadapt modules if miniforge not available
+  module load python cutadapt 2>/dev/null || {
+    echo "ERROR: Could not load miniforge, python, or cutadapt"
+    exit 1
+  }
+fi
 set -u  # Re-enable strict mode
 
 # Determine which primers to validate

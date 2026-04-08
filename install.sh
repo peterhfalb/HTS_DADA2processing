@@ -13,11 +13,11 @@ echo "DADA2 Pipeline Environment Setup"
 echo "=========================================="
 echo ""
 
-# Load conda module
-module load conda
+# Load miniforge (modern conda/mamba)
+module load miniforge/24.3
 
-# Source conda
-CONDA_BASE=$(conda info --base 2>/dev/null) || { echo "ERROR: conda not found. Please load/install conda first."; exit 1; }
+# Source conda/mamba
+CONDA_BASE=$(conda info --base 2>/dev/null) || { echo "ERROR: miniforge not found."; exit 1; }
 source "$CONDA_BASE/etc/profile.d/conda.sh"
 
 # Check if environment file exists
