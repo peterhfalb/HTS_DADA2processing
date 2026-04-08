@@ -6,7 +6,7 @@ rule dada2:
     """DADA2 denoising and taxonomy assignment"""
     input:
         reads=expand(
-            OUTPUT_DIR + "/02_primer_trimmed/{sample}_L001_R1_001.fastq.gz",
+            OUTPUT_DIR + "/02_primer_trimmed/{sample}_R1_001.fastq.gz",
             sample=SAMPLES,
         ),
     output:
@@ -104,7 +104,7 @@ rule dada2_qc:
         seqtab_nochim = OUTPUT_DIR + "/03_dada2/seqtab_nochim.rds",
         adapter_logs  = expand(OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.log.txt", sample=SAMPLES),
         primer_logs   = expand(OUTPUT_DIR + "/02_primer_trimmed/02_logs/cutadapt.{sample}.log.txt", sample=SAMPLES),
-        primer_fqs    = expand(OUTPUT_DIR + "/02_primer_trimmed/{sample}_L001_R1_001.fastq.gz", sample=SAMPLES),
+        primer_fqs    = expand(OUTPUT_DIR + "/02_primer_trimmed/{sample}_R1_001.fastq.gz", sample=SAMPLES),
     output:
         qc_summary = OUTPUT_DIR + "/04_QC/qc_summary.txt",
     params:

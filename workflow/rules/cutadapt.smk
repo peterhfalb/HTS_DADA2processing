@@ -6,14 +6,38 @@ Cutadapt rules: adapter and primer trimming
 # Step 1a: Adapter Trimming
 # ============================================================================
 
+def get_input_r1(wildcards):
+    """Find R1 file with or without _L001_ lane number"""
+    sample = wildcards.sample
+    with_lane = OUTPUT_DIR + f"/00_raw/{sample}_L001_R1_001.fastq.gz"
+    without_lane = OUTPUT_DIR + f"/00_raw/{sample}_R1_001.fastq.gz"
+    if os.path.exists(with_lane):
+        return with_lane
+    elif os.path.exists(without_lane):
+        return without_lane
+    else:
+        return with_lane  # Return default; let Snakemake error
+
+def get_input_r2(wildcards):
+    """Find R2 file with or without _L001_ lane number"""
+    sample = wildcards.sample
+    with_lane = OUTPUT_DIR + f"/00_raw/{sample}_L001_R2_001.fastq.gz"
+    without_lane = OUTPUT_DIR + f"/00_raw/{sample}_R2_001.fastq.gz"
+    if os.path.exists(with_lane):
+        return with_lane
+    elif os.path.exists(without_lane):
+        return without_lane
+    else:
+        return with_lane  # Return default; let Snakemake error
+
 rule trim_adapters:
     """Remove Illumina adapters from paired-end reads"""
     input:
-        r1=OUTPUT_DIR + "/00_raw/{sample}_L001_R1_001.fastq.gz",
-        r2=OUTPUT_DIR + "/00_raw/{sample}_L001_R2_001.fastq.gz",
+        r1=get_input_r1,
+        r2=get_input_r2,
     output:
-        r1=OUTPUT_DIR + "/01_adapter/{sample}_L001_R1_001.fastq.gz",
-        r2=OUTPUT_DIR + "/01_adapter/{sample}_L001_R2_001.fastq.gz",
+        r1=OUTPUT_DIR + "/01_adapter/{sample}_R1_001.fastq.gz",
+        r2=OUTPUT_DIR + "/01_adapter/{sample}_R2_001.fastq.gz",
         log=OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.log.txt",
     log:
         OUTPUT_DIR + "/.logs/cutadapt_adapter_{sample}.log",
@@ -52,8 +76,8 @@ rule summarize_adapter_logs:
 This directory contains paired-end reads after removal of Illumina adapters.
 
 ### Contents:
-- `<sample>_L001_R1_001.fastq.gz`: Forward reads with adapters removed
-- `<sample>_L001_R2_001.fastq.gz`: Reverse reads with adapters removed
+- `<sample>_R1_001.fastq.gz`: Forward reads with adapters removed
+- `<sample>_R2_001.fastq.gz`: Reverse reads with adapters removed
 - `01_logs/`: Individual cutadapt logs
 - `summary_adapter_trimming.txt`: Aggregate of "passing" reads per sample
 
@@ -74,11 +98,11 @@ EOF
 rule trim_primers:
     """Remove amplicon-specific primers"""
     input:
-        r1=OUTPUT_DIR + "/01_adapter/{sample}_L001_R1_001.fastq.gz",
-        r2=OUTPUT_DIR + "/01_adapter/{sample}_L001_R2_001.fastq.gz",
+        r1=OUTPUT_DIR + "/01_adapter/{sample}_R1_001.fastq.gz",
+        r2=OUTPUT_DIR + "/01_adapter/{sample}_R2_001.fastq.gz",
     output:
-        r1=OUTPUT_DIR + "/02_primer_trimmed/{sample}_L001_R1_001.fastq.gz",
-        r2=OUTPUT_DIR + "/02_primer_trimmed/{sample}_L001_R2_001.fastq.gz",
+        r1=OUTPUT_DIR + "/02_primer_trimmed/{sample}_R1_001.fastq.gz",
+        r2=OUTPUT_DIR + "/02_primer_trimmed/{sample}_R2_001.fastq.gz",
         log=OUTPUT_DIR + "/02_primer_trimmed/02_logs/cutadapt.{sample}.log.txt",
     params:
         fwd_primer=EFFECTIVE_FWD,
@@ -120,8 +144,8 @@ This directory contains paired-end reads after removal of amplicon-specific prim
 Reads without both primers have been discarded.
 
 ### Contents:
-- `<sample>_L001_R1_001.fastq.gz`: Forward reads with primers removed
-- `<sample>_L001_R2_001.fastq.gz`: Reverse reads with primers removed
+- `<sample>_R1_001.fastq.gz`: Forward reads with primers removed
+- `<sample>_R2_001.fastq.gz`: Reverse reads with primers removed
 - `02_logs/`: Individual cutadapt logs
 - `summary_primer_trimming.txt`: Aggregate of "passing" reads per sample
 

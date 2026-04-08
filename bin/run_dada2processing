@@ -152,18 +152,25 @@ PIPELINE_DIR="$(dirname "$SCRIPT_DIR")"
 # Create 00_raw directory with symlinks
 echo "Setting up raw data symlinks..."
 cd "$OUTPUT_DIR/00_raw"
+# Create symlinks for both _L001_ and non-_L001_ naming conventions
 for fastq in "$FASTQ_DIR"/*_R1_001.fastq.gz "$FASTQ_DIR"/*_R2_001.fastq.gz; do
     if [[ -f "$fastq" ]]; then
         ln -sf "$fastq" "$(basename "$fastq")" || true
     fi
 done
 
-# Extract sample names from R1 files (format: ProjectName_SampleName_L001_R1_001.fastq.gz)
-# We want just the ProjectName_SampleName part
+# Extract sample names from R1 files
+# Handle both naming conventions:
+# - With lane: ProjectName_SampleName_L001_R1_001.fastq.gz
+# - Without lane: ProjectName_SampleName_R1_001.fastq.gz
 SAMPLES=()
 for r1_file in *_R1_001.fastq.gz; do
-    # Remove _L001_R1_001.fastq.gz suffix to get sample name
+    # Try removing _L001_R1_001.fastq.gz first (with lane number)
     sample_name="${r1_file%_L001_R1_001.fastq.gz}"
+    # If that didn't work (name unchanged), try removing just _R1_001.fastq.gz (without lane)
+    if [[ "$sample_name" == "$r1_file" ]]; then
+        sample_name="${r1_file%_R1_001.fastq.gz}"
+    fi
     SAMPLES+=("$sample_name")
 done
 
