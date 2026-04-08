@@ -79,12 +79,11 @@ def run_cutadapt_primer_search(r1_file, r2_file, primers_dict, is_reverse=False)
         cmd = [
             "cutadapt",
             "--no-trim",
-            "--untrimmed-output=/dev/null",
             f"{flag}",
             f"file:{fasta_file}",
             f"--json={json_output}",
-            "-p",  # Process paired files
-            "/dev/null",  # Discard trimmed R2 output
+            "-o", "/dev/null",  # Discard trimmed R1 output
+            "-p", "/dev/null",  # Discard trimmed R2 output
             r1_file,
             r2_file,
         ]
