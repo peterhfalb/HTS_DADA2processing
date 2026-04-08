@@ -185,13 +185,15 @@ def main():
         pct = data["pct"]
         marker = ""
 
-        # Mark expected primer
-        if name == "515f" and expected_fwd == PRIMER_FWD.get("515f"):
-            marker = " <-- EXPECTED"
-        elif name in PRIMER_FWD and PRIMER_FWD[name] == expected_fwd:
-            marker = " <-- EXPECTED"
+        # Mark expected primer (exact match OR primer contains expected sequence)
+        if name in PRIMER_FWD:
+            if PRIMER_FWD[name] == expected_fwd:
+                marker = " <-- EXPECTED"
+            elif expected_fwd in PRIMER_FWD[name]:
+                # Detected primer is a superset/degenerate version of expected
+                marker = " <-- EXPECTED (degenerate variant)"
 
-        # Highlight unexpected high-frequency primers
+        # Highlight unexpected high-frequency primers (but not if they contain expected sequence)
         if pct > 80 and not marker:
             marker = " <-- UNEXPECTED! (>80%)"
         elif pct > 50 and not marker:
@@ -218,13 +220,15 @@ def main():
         pct = data["pct"]
         marker = ""
 
-        # Mark expected primer
-        if name == "806r" and expected_rev == PRIMER_REV.get("806r"):
-            marker = " <-- EXPECTED"
-        elif name in PRIMER_REV and PRIMER_REV[name] == expected_rev:
-            marker = " <-- EXPECTED"
+        # Mark expected primer (exact match OR primer contains expected sequence)
+        if name in PRIMER_REV:
+            if PRIMER_REV[name] == expected_rev:
+                marker = " <-- EXPECTED"
+            elif expected_rev in PRIMER_REV[name]:
+                # Detected primer is a superset/degenerate version of expected
+                marker = " <-- EXPECTED (degenerate variant)"
 
-        # Highlight unexpected high-frequency primers
+        # Highlight unexpected high-frequency primers (but not if they contain expected sequence)
         if pct > 80 and not marker:
             marker = " <-- UNEXPECTED! (>80%)"
         elif pct > 50 and not marker:
@@ -238,11 +242,14 @@ def main():
     print("=" * 50)
 
     # Find expected primers in results
+    # Check for exact match OR if expected primer is contained in detected primer (for degenerate primers)
     expected_fwd_found = any(
-        PRIMER_FWD.get(name) == expected_fwd and data["pct"] > 80 for name, data in fwd_results.items()
+        (PRIMER_FWD.get(name) == expected_fwd or expected_fwd in PRIMER_FWD.get(name, "")) and data["pct"] > 80
+        for name, data in fwd_results.items()
     )
     expected_rev_found = any(
-        PRIMER_REV.get(name) == expected_rev and data["pct"] > 80 for name, data in rev_results.items()
+        (PRIMER_REV.get(name) == expected_rev or expected_rev in PRIMER_REV.get(name, "")) and data["pct"] > 80
+        for name, data in rev_results.items()
     )
 
     # Special note for 18S-V4
@@ -298,6 +305,26 @@ def main():
 
     print()
     print("Do NOT proceed with SLURM submission until primers are confirmed!")
+
+    # Output detected primers as JSON for automated primer switching
+    # Find the highest-frequency primer for each direction
+    detected_primers = {
+        "fwd_name": sorted_fwd[0][0] if sorted_fwd else None,
+        "fwd_seq": PRIMER_FWD.get(sorted_fwd[0][0]) if sorted_fwd else None,
+        "fwd_pct": sorted_fwd[0][1]["pct"] if sorted_fwd else 0,
+        "rev_name": sorted_rev[0][0] if sorted_rev else None,
+        "rev_seq": PRIMER_REV.get(sorted_rev[0][0]) if sorted_rev else None,
+        "rev_pct": sorted_rev[0][1]["pct"] if sorted_rev else 0,
+        "expected_fwd": expected_fwd,
+        "expected_rev": expected_rev,
+    }
+
+    # Write detected primers to a JSON file for the bash script to read
+    json_output_path = os.path.join(fastq_dir, ".primer_detection.json")
+    with open(json_output_path, "w") as f:
+        json.dump(detected_primers, f, indent=2)
+
+    print(f"\n[Primer detection results saved]")
 
 
 if __name__ == "__main__":
