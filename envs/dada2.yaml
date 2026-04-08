@@ -4,6 +4,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
+  - python=3.12
   - bioconductor-dada2
   - r-base>=4.4
   - cutadapt>=4.0

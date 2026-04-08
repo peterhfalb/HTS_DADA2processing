@@ -71,10 +71,18 @@ conda activate "$ENV_NAME"
 echo ""
 echo "Checking Python packages..."
 
-if python3 -c "import cutadapt; print(f'cutadapt: {cutadapt.__version__}')" 2>/dev/null; then
+if python3 -c "import cutadapt; print(f'cutadapt: {cutadapt.__version__}')" 2>&1; then
     echo "✓ cutadapt"
 else
     echo "✗ cutadapt FAILED"
+    echo ""
+    echo "Debugging info:"
+    echo "Python version: $(python3 --version)"
+    echo "Cutadapt install check: $(conda list -n $ENV_NAME cutadapt)"
+    echo ""
+    echo "Try manually activating and testing:"
+    echo "  conda activate $ENV_NAME"
+    echo "  python3 -c \"import cutadapt\""
     exit 1
 fi
 
