@@ -96,9 +96,28 @@ def run_cutadapt_primer_search(fastq_file, primers_dict, is_reverse=False):
         with open(json_output) as f:
             data = json.load(f)
 
+        # Debug: print JSON structure if read_counts is missing
+        if "read_counts" not in data:
+            print(f"DEBUG: JSON structure: {json.dumps(data, indent=2)[:500]}", file=sys.stderr)
+
         # Extract adapter matches
         results = {}
-        total_reads = data["read_counts"][0]
+
+        # Handle different cutadapt JSON structures
+        # read_counts can be either:
+        # - list: [input, output]
+        # - dict: {"input": N, "output": N}
+        # - direct int in older versions
+        read_counts_data = data.get("read_counts")
+        if isinstance(read_counts_data, list) and len(read_counts_data) > 0:
+            total_reads = read_counts_data[0]
+        elif isinstance(read_counts_data, dict):
+            total_reads = read_counts_data.get("input", read_counts_data.get("total", 0))
+        elif isinstance(read_counts_data, int):
+            total_reads = read_counts_data
+        else:
+            # Fallback: count from adapters if present
+            total_reads = sum(a.get("matches", 0) for a in data.get("adapters", [])) or 1
 
         for adapter_info in data.get("adapters", []):
             name = adapter_info["name"]
