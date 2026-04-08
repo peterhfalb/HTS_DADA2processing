@@ -1,40 +1,133 @@
 #!/bin/bash
-# Install script: adds pipeline bin/ directory to user's PATH
-
 set -euo pipefail
 
-# Get the absolute path of the script's directory
-SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-BIN_DIR="$SCRIPT_DIR/bin"
+# DADA2 Pipeline Installation Script
+# Sets up conda environment with all required dependencies
 
-echo "Installing DADA2 Pipeline..."
-echo "Bin directory: $BIN_DIR"
+PIPELINE_DIR="$(cd "$(dirname "$0")" && pwd)"
+ENV_FILE="$PIPELINE_DIR/envs/dada2.yaml"
+ENV_NAME="dada2_processing_v2"
 
-# Check if PATH already contains this directory
-if grep -q "$BIN_DIR" ~/.bashrc 2>/dev/null; then
-    echo "✓ Already in PATH"
-else
-    echo "Adding $BIN_DIR to ~/.bashrc"
-    cat >> ~/.bashrc << EOF
+echo "=========================================="
+echo "DADA2 Pipeline Environment Setup"
+echo "=========================================="
+echo ""
 
-# Added by DADA2 Pipeline installer
-export PATH="$BIN_DIR:\$PATH"
-EOF
-    echo "✓ Added to PATH"
+# Load conda module
+module load conda
+
+# Source conda
+CONDA_BASE=$(conda info --base 2>/dev/null) || { echo "ERROR: conda not found. Please load/install conda first."; exit 1; }
+source "$CONDA_BASE/etc/profile.d/conda.sh"
+
+# Check if environment file exists
+if [[ ! -f "$ENV_FILE" ]]; then
+    echo "ERROR: Environment file not found: $ENV_FILE"
+    exit 1
 fi
 
-# Make sure the script is executable
-chmod +x "$BIN_DIR/run_dada2processing"
-echo "✓ Made run_dada2processing executable"
+echo "Pipeline directory: $PIPELINE_DIR"
+echo "Environment file:   $ENV_FILE"
+echo "Environment name:   $ENV_NAME"
+echo ""
 
+# Check if environment already exists
+if conda env list | grep -q "^$ENV_NAME "; then
+    echo "⚠️  Environment '$ENV_NAME' already exists"
+    read -p "Delete and recreate? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo "Removing existing environment..."
+        conda env remove -n "$ENV_NAME" --yes
+    else
+        echo "Using existing environment. Skipping creation."
+        SKIP_CREATE=1
+    fi
+fi
+
+# Create environment if needed
+if [[ "${SKIP_CREATE:-0}" != "1" ]]; then
+    echo "Creating conda environment (this may take 5-15 minutes)..."
+    echo ""
+    conda env create -f "$ENV_FILE" --yes
+    echo ""
+    echo "✓ Environment created"
+fi
+
+# ==============================================================================
+# VERIFICATION
+# ==============================================================================
 echo ""
 echo "=========================================="
-echo "Installation complete!"
+echo "VERIFYING PACKAGES"
 echo "=========================================="
 echo ""
-echo "To activate the changes, run:"
-echo "  source ~/.bashrc"
+
+# Activate environment
+echo "Activating environment..."
+conda activate "$ENV_NAME"
+
+# Verify Python packages
 echo ""
-echo "Then you can use:"
-echo "  run_dada2processing --help"
+echo "Checking Python packages..."
+
+if python3 -c "import cutadapt; print(f'cutadapt: {cutadapt.__version__}')" 2>/dev/null; then
+    echo "✓ cutadapt"
+else
+    echo "✗ cutadapt FAILED"
+    exit 1
+fi
+
+# Verify R packages
+echo ""
+echo "Checking R packages..."
+
+R_VERIFY=$(R --quiet --slave << 'RSCRIPT'
+packages <- c("dada2", "jsonlite", "ggplot2")
+results <- list()
+for (pkg in packages) {
+    results[[pkg]] <- require(pkg, character.only = TRUE, quietly = TRUE)
+}
+for (pkg in packages) {
+    status <- ifelse(results[[pkg]], "✓", "✗")
+    cat(sprintf("%s %s\n", status, pkg))
+    if (!results[[pkg]]) {
+        quit(status = 1)
+    }
+}
+RSCRIPT
+)
+
+if [[ $? -eq 0 ]]; then
+    echo "$R_VERIFY"
+else
+    echo "✗ Some R packages failed to load"
+    echo "$R_VERIFY"
+    exit 1
+fi
+
+# Verify Snakemake
+echo ""
+echo "Checking pipeline tools..."
+
+if snakemake --version 2>/dev/null | head -1; then
+    echo "✓ snakemake"
+else
+    echo "⚠️  snakemake not found (will be loaded via module in SLURM jobs)"
+fi
+
+# Summary
+echo ""
+echo "=========================================="
+echo "✓ SETUP COMPLETE"
+echo "=========================================="
+echo ""
+echo "The environment is ready. You can now submit SLURM jobs:"
+echo ""
+echo "  cd $PIPELINE_DIR"
+echo "  run_dada2processing --amplicon 16S-V4 --fastq-dir ./raw_fastqs \\"
+echo "    --output-dir ./output --email user@example.com"
+echo ""
+echo "Then:"
+echo "  sbatch ./output/submit_job.sh"
 echo ""
