@@ -57,9 +57,9 @@ def find_fastq_files(fastq_dir):
     return r1_files[0], r2_files[0]
 
 
-def run_cutadapt_primer_search(fastq_file, primers_dict, is_reverse=False):
+def run_cutadapt_primer_search(r1_file, r2_file, primers_dict, is_reverse=False):
     """
-    Run cutadapt to search for primers in FASTQ file
+    Run cutadapt to search for primers in paired-end FASTQ files
     Returns dict of {primer_name: match_count}
     """
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -71,9 +71,9 @@ def run_cutadapt_primer_search(fastq_file, primers_dict, is_reverse=False):
 
         json_output = os.path.join(tmpdir, "results.json")
 
-        # Run cutadapt
-        # -g for forward strand (5' adapters)
-        # -G for reverse strand (3' adapters on reverse read)
+        # Run cutadapt in paired-end mode
+        # -g for forward strand (5' adapters on R1)
+        # -G for reverse strand (3' adapters on R2)
         flag = "-G" if is_reverse else "-g"
 
         cmd = [
@@ -83,7 +83,10 @@ def run_cutadapt_primer_search(fastq_file, primers_dict, is_reverse=False):
             f"{flag}",
             f"file:{fasta_file}",
             f"--json={json_output}",
-            fastq_file,
+            "-p",  # Process paired files
+            "/dev/null",  # Discard trimmed R2 output
+            r1_file,
+            r2_file,
         ]
 
         try:
@@ -161,7 +164,7 @@ def main():
     print("-" * 50)
     print(f"Expected: {expected_fwd}")
 
-    fwd_results, fwd_total = run_cutadapt_primer_search(r1_file, PRIMER_FWD, is_reverse=False)
+    fwd_results, fwd_total = run_cutadapt_primer_search(r1_file, r2_file, PRIMER_FWD, is_reverse=False)
 
     # Sort by match frequency
     sorted_fwd = sorted(fwd_results.items(), key=lambda x: x[1]["matches"], reverse=True)
@@ -194,7 +197,7 @@ def main():
     print("-" * 50)
     print(f"Expected: {expected_rev}")
 
-    rev_results, rev_total = run_cutadapt_primer_search(r2_file, PRIMER_REV, is_reverse=True)
+    rev_results, rev_total = run_cutadapt_primer_search(r1_file, r2_file, PRIMER_REV, is_reverse=True)
 
     # Sort by match frequency
     sorted_rev = sorted(rev_results.items(), key=lambda x: x[1]["matches"], reverse=True)
