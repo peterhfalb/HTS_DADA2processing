@@ -118,18 +118,22 @@ def run_cutadapt_primer_search(r1_file, r2_file, primers_dict, is_reverse=False)
         elif isinstance(read_counts_data, int):
             total_reads = read_counts_data
         else:
-            # Fallback: count from adapters if present
-            total_reads = sum(a.get("matches", 0) for a in data.get("adapters", [])) or 1
+            total_reads = 1
 
-        for adapter_info in data.get("adapters", []):
+        # Parse adapters from either old format (adapters) or new format (adapters_read1/adapters_read2)
+        adapters_list = []
+        if "adapters" in data:
+            adapters_list = data.get("adapters", [])
+        elif is_reverse and "adapters_read2" in data:
+            adapters_list = data.get("adapters_read2", [])
+        elif not is_reverse and "adapters_read1" in data:
+            adapters_list = data.get("adapters_read1", [])
+
+        for adapter_info in adapters_list:
             name = adapter_info["name"]
-            matches = adapter_info["matches"]
+            # Handle both old "matches" and new "total_matches" field names
+            matches = adapter_info.get("total_matches") or adapter_info.get("matches", 0)
             results[name] = {"matches": matches, "pct": 100 * matches / total_reads if total_reads > 0 else 0}
-
-        # Debug: print full JSON if no adapters found
-        if not results:
-            print(f"DEBUG: No adapters found in JSON. Full JSON structure:", file=sys.stderr)
-            print(json.dumps(data, indent=2), file=sys.stderr)
 
         return results, total_reads
 
