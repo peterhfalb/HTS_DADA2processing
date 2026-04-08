@@ -273,6 +273,15 @@ echo "PRIMER VALIDATION"
 echo "=========================================="
 echo ""
 
+# Load R module (required for primer validation)
+set +u  # Temporarily disable strict mode for module loading
+module load R 2>/dev/null || {
+  echo "ERROR: Could not load R module. Primer validation requires R."
+  echo "Please check that the R module is available on this system."
+  exit 1
+}
+set -u  # Re-enable strict mode
+
 # Determine which primers to validate
 VALIDATE_FWD="${FWD_PRIMER_OVERRIDE:-$(
   case "$AMPLICON" in
