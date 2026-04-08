@@ -216,8 +216,15 @@ if conda env list | grep -q "$DADA2_ENV"; then
     echo "Using existing $DADA2_ENV environment..."
 else
     echo "Creating $DADA2_ENV environment (this may take several minutes)..."
-    conda create -n $DADA2_ENV -c bioconda -c conda-forge \
-        bioconductor-dada2 cutadapt r-base -y
+    ENV_FILE="$PIPELINE_DIR/envs/dada2.yaml"
+    if [[ -f "$ENV_FILE" ]]; then
+        conda env create -f "$ENV_FILE"
+    else
+        # Fallback if environment file not found
+        echo "WARNING: envs/dada2.yaml not found, using minimal packages..."
+        conda create -n $DADA2_ENV -c bioconda -c conda-forge \
+            bioconductor-dada2 cutadapt r-base r-jsonlite r-ggplot2 -y
+    fi
 fi
 
 conda activate $DADA2_ENV
