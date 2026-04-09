@@ -208,6 +208,8 @@ OUTPUT_DIR="PLACEHOLDER_OUTPUT_DIR"
 
 set +u  # Temporarily disable strict mode for conda/mamba
 module load miniforge/24.3
+module load cutadapt/5.0
+module load snakemake
 CONDA_BASE=$(conda info --base 2>/dev/null) || { echo "ERROR: miniforge not found"; exit 1; }
 source "$CONDA_BASE/etc/profile.d/conda.sh"
 
@@ -224,14 +226,12 @@ else
         # Fallback if environment file not found
         echo "WARNING: envs/dada2.yaml not found, using minimal packages..."
         conda create -n $DADA2_ENV -c bioconda -c conda-forge \
-            bioconductor-dada2 cutadapt r-base r-jsonlite r-ggplot2 -y
+            bioconductor-dada2 r-base r-jsonlite r-ggplot2 -y
     fi
 fi
 
 conda activate $DADA2_ENV
 set -u  # Re-enable strict mode
-
-module load snakemake
 
 snakemake \
   --snakefile "$PIPELINE_DIR/Snakefile" \
@@ -268,14 +268,10 @@ echo ""
 
 # Load required modules for primer validation
 set +u  # Temporarily disable strict mode for module loading
-# Try to use miniforge first (has python and cutadapt)
-if ! module load miniforge/24.3 2>/dev/null; then
-  # Fallback to python/cutadapt modules if miniforge not available
-  module load python cutadapt 2>/dev/null || {
-    echo "ERROR: Could not load miniforge, python, or cutadapt"
-    exit 1
-  }
-fi
+module load cutadapt/5.0 || {
+  echo "ERROR: Could not load cutadapt/5.0 module"
+  exit 1
+}
 set -u  # Re-enable strict mode
 
 # Determine which primers to validate

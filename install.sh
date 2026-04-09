@@ -67,24 +67,25 @@ echo ""
 echo "Activating environment..."
 conda activate "$ENV_NAME"
 
-# Verify Python packages
+# Verify system modules (outside conda environment)
 echo ""
-echo "Checking Python packages..."
+echo "Checking system modules..."
 
-if python3 -c "import cutadapt; print(f'cutadapt: {cutadapt.__version__}')" 2>&1; then
-    echo "✓ cutadapt"
-else
-    echo "✗ cutadapt FAILED"
-    echo ""
-    echo "Debugging info:"
-    echo "Python version: $(python3 --version)"
-    echo "Cutadapt install check: $(conda list -n $ENV_NAME cutadapt)"
-    echo ""
-    echo "Try manually activating and testing:"
-    echo "  conda activate $ENV_NAME"
-    echo "  python3 -c \"import cutadapt\""
-    exit 1
-fi
+set +u
+module load cutadapt/5.0 2>/dev/null && {
+    CUTADAPT_VERSION=$(cutadapt --version 2>&1 | head -1)
+    echo "✓ cutadapt/5.0 ($CUTADAPT_VERSION)"
+} || {
+    echo "⚠️  cutadapt/5.0 module not available (will load in SLURM jobs)"
+}
+
+module load snakemake 2>/dev/null && {
+    SNAKEMAKE_VERSION=$(snakemake --version 2>&1)
+    echo "✓ snakemake ($SNAKEMAKE_VERSION)"
+} || {
+    echo "⚠️  snakemake module not available (will load in SLURM jobs)"
+}
+set -u
 
 # Verify R packages
 echo ""
@@ -112,16 +113,6 @@ else
     echo "✗ Some R packages failed to load"
     echo "$R_VERIFY"
     exit 1
-fi
-
-# Verify Snakemake
-echo ""
-echo "Checking pipeline tools..."
-
-if snakemake --version 2>/dev/null | head -1; then
-    echo "✓ snakemake"
-else
-    echo "⚠️  snakemake not found (will be loaded via module in SLURM jobs)"
 fi
 
 # Summary
