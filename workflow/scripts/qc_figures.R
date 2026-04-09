@@ -48,8 +48,8 @@ parse_cutadapt_json <- function(json_path) {
       output = output_reads,
       r1_with_adapter = reads_with_adapter_r1,
       r2_with_adapter = reads_with_adapter_r2,
-      pct_r1 = 100 * reads_with_adapter_r1 / total_reads if (!is.null(reads_with_adapter_r1)) else NA,
-      pct_r2 = 100 * reads_with_adapter_r2 / total_reads if (!is.null(reads_with_adapter_r2)) else NA
+      pct_r1 = ifelse(!is.null(reads_with_adapter_r1), 100 * reads_with_adapter_r1 / total_reads, NA),
+      pct_r2 = ifelse(!is.null(reads_with_adapter_r2), 100 * reads_with_adapter_r2 / total_reads, NA)
     )
   }, error = function(e) {
     cat("Warning: could not parse JSON", json_path, "\n")
