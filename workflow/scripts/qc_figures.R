@@ -4,6 +4,7 @@
 
 library(dada2)
 library(jsonlite)
+library(ggplot2)
 
 # Parse command-line arguments
 args <- commandArgs(trailingOnly = TRUE)
@@ -81,7 +82,7 @@ parse_cutadapt_json <- function(json_path) {
 }
 
 # Parse adapter JSONs
-adapter_json_dir <- file.path(dirname(dirname(primer_trimmed_dir)), "01_adapter", "01_logs")
+adapter_json_dir <- file.path(dirname(primer_trimmed_dir), "01_adapter", "01_logs")
 cat("Looking for adapter JSONs in:", adapter_json_dir, "\n")
 adapter_jsons <- list.files(adapter_json_dir, pattern = "^cutadapt\\..*\\.json$", full.names = TRUE)
 cat("  Found", length(adapter_jsons), "adapter JSON files\n")
@@ -339,8 +340,6 @@ tryCatch({
 cat("Generating read tracking figure...\n")
 
 tryCatch({
-  library(ggplot2)
-
   # Build read tracking data from all available columns
   step_labels <- c("reads_start", "adapter_passing", "primer_passing", "reads_dada2_input", "dada2_filtered", "dada2_merged", "dada2_nonchim")
   step_names <- c("Start", "Adapter\nRemoved", "Primer\nRemoved", "DADA2\nInput", "After\nFilter", "After\nMerge", "After\nChimera")
@@ -372,7 +371,7 @@ tryCatch({
   if (nrow(step_data) > 0) {
     # Create ggplot with better spacing
     p <- ggplot(step_data, aes(x = factor(step_name, levels = step_names[1:nrow(step_data)]), y = mean_reads, fill = step_name)) +
-      geom_bar(stat = "identity", color = "black", size = 0.7) +
+      geom_bar(stat = "identity", color = "black", linewidth = 0.7) +
       theme_minimal() +
       theme(
         axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 11, margin = margin(t = 10)),
