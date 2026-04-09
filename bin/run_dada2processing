@@ -139,9 +139,11 @@ if ! ls "$FASTQ_DIR"/*_R1_001.fastq.gz &>/dev/null; then
 fi
 
 echo ""
-echo "=========================================="
-echo "DADA2 PROCESSING PIPELINE"
-echo "=========================================="
+echo "-<->-<->-<->-<->-<->-<->-<->-<->-<->-<->-<->-"
+echo "-=-=-=-=-           DADA2           -=-=-=-=-"
+echo "-=-=-=-=-        PROCESSING         -=-=-=-=-"
+echo "-=-=-=-=-         PIPELINE          -=-=-=-=-"
+echo "-<->-<->-<->-<->-<->-<->-<->-<->-<->-<->-<->-"
 echo ""
 
 echo "Setting up directories and writing SLURM script..."
