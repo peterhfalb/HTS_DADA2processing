@@ -38,17 +38,25 @@ parse_cutadapt_json <- function(json_path) {
   tryCatch({
     data <- jsonlite::fromJSON(json_path)
 
+    # Debug: show top-level keys
+    cat("      JSON top-level keys:", paste(names(data), collapse=", "), "\n")
+
     # Extract read counts - handle different cutadapt versions
     if (!is.null(data$read_counts)) {
       rc <- data$read_counts
-    } else if (!is.null(data$statistics$input)) {
+      cat("      Using read_counts section. Keys:", paste(names(rc), collapse=", "), "\n")
+    } else if (!is.null(data$statistics)) {
       rc <- data$statistics
+      cat("      Using statistics section. Keys:", paste(names(rc), collapse=", "), "\n")
     } else {
+      cat("      No read_counts or statistics section found!\n")
       rc <- list(input = NA, output = NA)
     }
 
     total_reads <- if (!is.null(rc$input)) rc$input else NA
     output_reads <- if (!is.null(rc$output)) rc$output else NA
+
+    cat("      Input reads:", total_reads, "Output reads:", output_reads, "\n")
 
     # Try to extract adapter counts from various possible field names
     r1_adapter <- NA
@@ -56,14 +64,22 @@ parse_cutadapt_json <- function(json_path) {
 
     if (!is.null(rc$read1_with_adapter)) {
       r1_adapter <- rc$read1_with_adapter
+      cat("      Found read1_with_adapter:", r1_adapter, "\n")
     } else if (!is.null(rc$reads_read1_with_trimmed_adapter)) {
       r1_adapter <- rc$reads_read1_with_trimmed_adapter
+      cat("      Found reads_read1_with_trimmed_adapter:", r1_adapter, "\n")
+    } else {
+      cat("      No R1 adapter field found\n")
     }
 
     if (!is.null(rc$read2_with_adapter)) {
       r2_adapter <- rc$read2_with_adapter
+      cat("      Found read2_with_adapter:", r2_adapter, "\n")
     } else if (!is.null(rc$reads_read2_with_trimmed_adapter)) {
       r2_adapter <- rc$reads_read2_with_trimmed_adapter
+      cat("      Found reads_read2_with_trimmed_adapter:", r2_adapter, "\n")
+    } else {
+      cat("      No R2 adapter field found\n")
     }
 
     list(
@@ -76,43 +92,87 @@ parse_cutadapt_json <- function(json_path) {
       pct_removed = ifelse(!is.na(total_reads) && !is.na(output_reads) && total_reads > 0, 100 * (total_reads - output_reads) / total_reads, NA)
     )
   }, error = function(e) {
-    cat("Warning: could not parse JSON", json_path, ":", e$message, "\n")
+    cat("      ERROR:", e$message, "\n")
     list(input = NA, output = NA, r1_with_adapter = NA, r2_with_adapter = NA, pct_r1 = NA, pct_r2 = NA, pct_removed = NA)
   })
 }
 
 # Parse adapter JSONs
-adapter_json_dir <- file.path(dirname(primer_trimmed_dir), "01_adapter", "01_logs")
+base_output_dir <- dirname(primer_trimmed_dir)
+cat("Base output directory:", base_output_dir, "\n")
+
+adapter_json_dir <- file.path(base_output_dir, "01_adapter", "01_logs")
 cat("Looking for adapter JSONs in:", adapter_json_dir, "\n")
+cat("  Directory exists:", dir.exists(adapter_json_dir), "\n")
+
+if (dir.exists(adapter_json_dir)) {
+  all_files <- list.files(adapter_json_dir)
+  cat("  All files in directory:", paste(all_files, collapse=", "), "\n")
+}
+
 adapter_jsons <- list.files(adapter_json_dir, pattern = "^cutadapt\\..*\\.json$", full.names = TRUE)
-cat("  Found", length(adapter_jsons), "adapter JSON files\n")
+cat("  Found", length(adapter_jsons), "adapter JSON files matching pattern\n")
+
+# Also try alternative patterns
+if (length(adapter_jsons) == 0) {
+  cat("  Trying alternative pattern *.json...\n")
+  adapter_jsons <- list.files(adapter_json_dir, pattern = "\\.json$", full.names = TRUE)
+  cat("  Found", length(adapter_jsons), "JSON files with *.json pattern\n")
+}
 
 adapter_stats <- list()
 for (json_file in adapter_jsons) {
   sample_name <- sub("^cutadapt\\.", "", sub("\\.json$", "", basename(json_file)))
+  sample_name <- sub("cutadapt\\.", "", sample_name)  # Handle case without prefix
+  cat("  Parsing:", basename(json_file), "-> sample:", sample_name, "\n")
   stats <- parse_cutadapt_json(json_file)
   adapter_stats[[sample_name]] <- stats
+  cat("    Extracted: input=", stats$input, " output=", stats$output, " pct_removed=", stats$pct_removed, "\n")
 }
 
 # Parse primer JSONs
-primer_json_dir <- file.path(primer_trimmed_dir, "02_logs")
+primer_json_dir <- file.path(base_output_dir, "02_primer_trimmed", "02_logs")
 cat("Looking for primer JSONs in:", primer_json_dir, "\n")
+cat("  Directory exists:", dir.exists(primer_json_dir), "\n")
+
 primer_jsons <- list.files(primer_json_dir, pattern = "^cutadapt\\..*\\.json$", full.names = TRUE)
-cat("  Found", length(primer_jsons), "primer JSON files\n")
+cat("  Found", length(primer_jsons), "primer JSON files matching pattern\n")
+
+# Also try alternative patterns
+if (length(primer_jsons) == 0) {
+  cat("  Trying alternative pattern *.json...\n")
+  primer_jsons <- list.files(primer_json_dir, pattern = "\\.json$", full.names = TRUE)
+  cat("  Found", length(primer_jsons), "JSON files with *.json pattern\n")
+}
 
 primer_stats <- list()
 for (json_file in primer_jsons) {
   sample_name <- sub("^cutadapt\\.", "", sub("\\.json$", "", basename(json_file)))
+  sample_name <- sub("cutadapt\\.", "", sample_name)  # Handle case without prefix
+  cat("  Parsing:", basename(json_file), "-> sample:", sample_name, "\n")
   stats <- parse_cutadapt_json(json_file)
   primer_stats[[sample_name]] <- stats
+  cat("    Extracted: input=", stats$input, " output=", stats$output, " pct_removed=", stats$pct_removed, "\n")
 }
 
+cat("\n")
 # Debug: show what was parsed
 if (length(adapter_stats) > 0) {
   cat("Adapter stats summary:\n")
-  for (sname in names(adapter_stats)[1:min(2, length(adapter_stats))]) {
+  for (sname in names(adapter_stats)) {
     cat("  ", sname, ": input=", adapter_stats[[sname]]$input, " output=", adapter_stats[[sname]]$output, " pct_removed=", adapter_stats[[sname]]$pct_removed, "\n")
   }
+} else {
+  cat("No adapter stats were parsed!\n")
+}
+
+if (length(primer_stats) > 0) {
+  cat("Primer stats summary:\n")
+  for (sname in names(primer_stats)) {
+    cat("  ", sname, ": input=", primer_stats[[sname]]$input, " output=", primer_stats[[sname]]$output, " pct_removed=", primer_stats[[sname]]$pct_removed, "\n")
+  }
+} else {
+  cat("No primer stats were parsed!\n")
 }
 
 # ==============================================================================

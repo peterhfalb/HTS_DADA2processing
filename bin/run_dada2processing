@@ -138,6 +138,14 @@ if ! ls "$FASTQ_DIR"/*_R1_001.fastq.gz &>/dev/null; then
     exit 1
 fi
 
+echo ""
+echo "=========================================="
+echo "DADA2 PROCESSING PIPELINE"
+echo "=========================================="
+echo ""
+
+echo "Setting up directories and writing SLURM script..."
+
 # Create output directory structure
 mkdir -p "$OUTPUT_DIR"/{00_raw,logs}
 OUTPUT_DIR=$(cd "$OUTPUT_DIR" && pwd)
@@ -150,7 +158,7 @@ SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 PIPELINE_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Create 00_raw directory with symlinks
-echo "Setting up raw data symlinks..."
+echo "Setting up synthetic links to fastq files..."
 cd "$OUTPUT_DIR/00_raw"
 # Create symlinks for both _L001_ and non-_L001_ naming conventions
 for fastq in "$FASTQ_DIR"/*_R1_001.fastq.gz "$FASTQ_DIR"/*_R2_001.fastq.gz; do
@@ -163,6 +171,9 @@ done
 # Handle both naming conventions:
 # - With lane: ProjectName_SampleName_L001_R1_001.fastq.gz
 # - Without lane: ProjectName_SampleName_R1_001.fastq.gz
+
+echo "Parsing fastq sample names..."
+
 SAMPLES=()
 for r1_file in *_R1_001.fastq.gz; do
     # Try removing _L001_R1_001.fastq.gz first (with lane number)
@@ -262,7 +273,7 @@ chmod +x "$SLURM_SCRIPT"
 # ==============================================================================
 echo ""
 echo "=========================================="
-echo "PRIMER VALIDATION"
+echo "VALIDATING PRIMERS"
 echo "=========================================="
 echo ""
 
@@ -294,6 +305,10 @@ VALIDATE_REV="${REV_PRIMER_OVERRIDE:-$(
     18S-V4)  echo "CCGTCAATTHCTTYAART" ;;
   esac
 )}"
+
+echo ""
+echo "Scanning fastq files for expected primers..."
+echo ""
 
 # Run primer check using cutadapt
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
@@ -446,6 +461,6 @@ echo ""
 echo "Submit job with:"
 echo "  sbatch $SLURM_SCRIPT"
 echo ""
-echo "Or dry-run with:"
+echo "Or dry-run with (only necessary for debugging purposes):"
 echo "  snakemake -n --snakefile $PIPELINE_DIR/Snakefile --configfile $CONFIG_FILE"
 echo "=========================================="
