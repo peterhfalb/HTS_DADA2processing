@@ -122,9 +122,10 @@ if (length(adapter_jsons) == 0) {
 
 adapter_stats <- list()
 for (json_file in adapter_jsons) {
-  sample_name <- sub("^cutadapt\\.", "", sub("\\.json$", "", basename(json_file)))
-  sample_name <- sub("cutadapt\\.", "", sample_name)  # Handle case without prefix
-  cat("  Parsing:", basename(json_file), "-> sample:", sample_name, "\n")
+  # Extract sample name, removing cutadapt prefix and _S\d+ Illumina index suffix
+  base_name <- sub("^cutadapt\\.", "", sub("\\.json$", "", basename(json_file)))
+  sample_name <- sub("_S\\d+$", "", base_name)  # Remove _S123 suffix
+  cat("  Parsing:", basename(json_file), "-> sample:", sample_name, "(from: ", base_name, ")\n")
   stats <- parse_cutadapt_json(json_file)
   adapter_stats[[sample_name]] <- stats
   cat("    Extracted: input=", stats$input, " output=", stats$output, " pct_removed=", stats$pct_removed, "\n")
@@ -147,9 +148,10 @@ if (length(primer_jsons) == 0) {
 
 primer_stats <- list()
 for (json_file in primer_jsons) {
-  sample_name <- sub("^cutadapt\\.", "", sub("\\.json$", "", basename(json_file)))
-  sample_name <- sub("cutadapt\\.", "", sample_name)  # Handle case without prefix
-  cat("  Parsing:", basename(json_file), "-> sample:", sample_name, "\n")
+  # Extract sample name, removing cutadapt prefix and _S\d+ Illumina index suffix
+  base_name <- sub("^cutadapt\\.", "", sub("\\.json$", "", basename(json_file)))
+  sample_name <- sub("_S\\d+$", "", base_name)  # Remove _S123 suffix
+  cat("  Parsing:", basename(json_file), "-> sample:", sample_name, "(from: ", base_name, ")\n")
   stats <- parse_cutadapt_json(json_file)
   primer_stats[[sample_name]] <- stats
   cat("    Extracted: input=", stats$input, " output=", stats$output, " pct_removed=", stats$pct_removed, "\n")
