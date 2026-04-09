@@ -1,6 +1,92 @@
 #!/bin/bash
 set -euo pipefail
 
+RED='\033[0;31m'
+CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
+WHITE='\033[1;37m'
+RESET='\033[0m'
+
+WIDTH=28
+STEPS=60
+
+echo ""
+
+for ((i=0; i<STEPS; i++)); do
+    left=$(awk -v i="$i" -v w="$WIDTH" 'BEGIN { printf "%d", int((sin(i * 0.27) + 1) / 2 * w) }')
+    right=$(awk -v i="$i" -v w="$WIDTH" 'BEGIN { printf "%d", int((sin(i * 0.27 + 3.14159) + 1) / 2 * w) }')
+
+    if [ "$left" -gt "$right" ]; then
+        tmp=$left; left=$right; right=$tmp
+    fi
+
+    line=""
+    for ((col=0; col<=WIDTH; col++)); do
+        if [ "$col" -eq "$left" ] && [ "$col" -eq "$right" ]; then
+            line+="${YELLOW}X${RESET}"
+        elif [ "$col" -eq "$left" ]; then
+            line+="${RED}O${RESET}"
+        elif [ "$col" -eq "$right" ]; then
+            line+="${CYAN}O${RESET}"
+        elif [ "$col" -gt "$left" ] && [ "$col" -lt "$right" ]; then
+            if (( col % 2 == 0 )); then
+                line+="${YELLOW}-${RESET}"
+            else
+                line+="${WHITE}-${RESET}"
+            fi
+        else
+            line+=" "
+        fi
+    done
+
+    echo -e "                  $line"
+    sleep 0.03
+done
+
+echo ""
+
+# ── Banner ─────────────────────────────────────────────────────────────────────
+# Visual box width = 64: '  ║' + 60 chars inner + '║'
+# Content rows: '  ║  ' (5) + art + padding + '║'  → art+padding = 58
+# DADA2 art = 40 wide  → 18 spaces padding
+# PIPELINE art = 55 wide → 3 spaces padding
+# Tagline = 54 wide (🧬 counts as 2 each) → 3 left + 3 right padding
+BRED='\033[1;31m'
+BYELLOW='\033[1;33m'
+BCYAN='\033[1;36m'
+
+bl() { echo -e "$1"; sleep 0.04; }
+
+sleep 0.15
+
+E='                  '  # 18 spaces (DADA2 padding)
+P='   '                 # 3 spaces  (PIPELINE padding)
+
+bl "${BCYAN}  ╔════════════════════════════════════════════════════════════╗${RESET}"
+bl "${BCYAN}  ║${RESET}                                                            ${BCYAN}║${RESET}"
+bl "${BCYAN}  ║  ${BRED}██████╗  █████╗ ██████╗  █████╗ ██████╗ ${RESET}${E}${BCYAN}║${RESET}"
+bl "${BCYAN}  ║  ${BRED}██╔══██╗██╔══██╗██╔══██╗██╔══██╗╚════██╗${RESET}${E}${BCYAN}║${RESET}"
+bl "${BCYAN}  ║  ${BRED}██║  ██║███████║██║  ██║███████║ █████╔╝${RESET}${E}${BCYAN}║${RESET}"
+bl "${BCYAN}  ║  ${BRED}██║  ██║██╔══██║██║  ██║██╔══██║██╔═══╝ ${RESET}${E}${BCYAN}║${RESET}"
+bl "${BCYAN}  ║  ${BRED}██████╔╝██║  ██║██████╔╝██║  ██║███████╗${RESET}${E}${BCYAN}║${RESET}"
+bl "${BCYAN}  ║  ${BRED}╚═════╝ ╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚══════╝${RESET}${E}${BCYAN}║${RESET}"
+bl "${BCYAN}  ║${RESET}                                                            ${BCYAN}║${RESET}"
+bl "${BCYAN}  ╠════════════════════════════════════════════════════════════╣${RESET}"
+bl "${BCYAN}  ║${RESET}                                                            ${BCYAN}║${RESET}"
+bl "${BCYAN}  ║  ${BYELLOW}██████╗ ██╗██████╗ ███████╗██╗     ██╗███╗  ██╗███████╗${RESET}${P}${BCYAN}║${RESET}"
+bl "${BCYAN}  ║  ${BYELLOW}██╔══██╗██║██╔══██╗██╔════╝██║     ██║████╗ ██║██╔════╝${RESET}${P}${BCYAN}║${RESET}"
+bl "${BCYAN}  ║  ${BYELLOW}██████╔╝██║██████╔╝█████╗  ██║     ██║██╔██╗██║█████╗  ${RESET}${P}${BCYAN}║${RESET}"
+bl "${BCYAN}  ║  ${BYELLOW}██╔═══╝ ██║██╔═══╝ ██╔══╝  ██║     ██║██║╚████║██╔══╝  ${RESET}${P}${BCYAN}║${RESET}"
+bl "${BCYAN}  ║  ${BYELLOW}██║     ██║██║     ███████╗███████╗██║██║ ╚███║███████╗${RESET}${P}${BCYAN}║${RESET}"
+bl "${BCYAN}  ║  ${BYELLOW}╚═╝     ╚═╝╚═╝     ╚══════╝╚══════╝╚═╝╚═╝  ╚══╝╚══════╝${RESET}${P}${BCYAN}║${RESET}"
+bl "${BCYAN}  ║${RESET}                                                            ${BCYAN}║${RESET}"
+bl "${BCYAN}  ╠════════════════════════════════════════════════════════════╣${RESET}"
+sleep 0.1
+bl "${BCYAN}  ║${RESET}   🧬  Amplicon denoising - It's a SLURM-apocalypse!!  🧬   ${BCYAN}║${RESET}"
+bl "${BCYAN}  ╚════════════════════════════════════════════════════════════╝${RESET}"
+echo ""
+
+
 # DADA2 Pipeline Installation Script
 # Sets up conda environment with all required dependencies
 
