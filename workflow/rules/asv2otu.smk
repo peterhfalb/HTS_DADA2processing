@@ -232,8 +232,8 @@ rule mumu_curation:
             -num_threads {threads} \
             -query OTU_centroids 2>&1 | tee -a {log}
 
-        # Prepare OTU table for mumu (remove header, keep OTU_ID column)
-        tail -n +2 {input.otutable} > mumu_table.txt
+        # Prepare OTU table for mumu (strip ;size= from OTU_ID, preserve header)
+        awk 'BEGIN{{FS=OFS="\\t"}} {{sub(/;.*/, "", $1); print}}' {input.otutable} > mumu_table.txt
 
         # Run mumu curation
         $HOME/packages/mumu/mumu \
