@@ -35,6 +35,9 @@ seqs <- readDNAStringSet(FASTA_PATH)
 seq_ids <- names(seqs)
 sequences <- as.character(seqs)
 
+# Strip size annotations (e.g., Seq000001;size=100 -> Seq000001)
+seq_ids <- sub(";.*", "", seq_ids)
+
 cat("Sequences to classify:", length(sequences), "\n")
 
 # ------------------------------------------------------------------------------

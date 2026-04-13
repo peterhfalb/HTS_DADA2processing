@@ -19,7 +19,7 @@ if (length(args) < 4) {
 OUTPUT_DIR  <- args[1]
 PROJECT     <- args[2]
 DB_NAME     <- args[3]
-SKIP_OTU    <- as.logical(args[4])
+SKIP_OTU    <- as.logical(as.numeric(args[4]))
 
 setwd(OUTPUT_DIR)
 
