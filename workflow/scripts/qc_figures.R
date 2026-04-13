@@ -38,25 +38,17 @@ parse_cutadapt_json <- function(json_path) {
   tryCatch({
     data <- jsonlite::fromJSON(json_path)
 
-    # Debug: show top-level keys
-    cat("      JSON top-level keys:", paste(names(data), collapse=", "), "\n")
-
     # Extract read counts - handle different cutadapt versions
     if (!is.null(data$read_counts)) {
       rc <- data$read_counts
-      cat("      Using read_counts section. Keys:", paste(names(rc), collapse=", "), "\n")
     } else if (!is.null(data$statistics)) {
       rc <- data$statistics
-      cat("      Using statistics section. Keys:", paste(names(rc), collapse=", "), "\n")
     } else {
-      cat("      No read_counts or statistics section found!\n")
       rc <- list(input = NA, output = NA)
     }
 
     total_reads <- if (!is.null(rc$input)) rc$input else NA
     output_reads <- if (!is.null(rc$output)) rc$output else NA
-
-    cat("      Input reads:", total_reads, "Output reads:", output_reads, "\n")
 
     # Try to extract adapter counts from various possible field names
     r1_adapter <- NA
@@ -64,22 +56,14 @@ parse_cutadapt_json <- function(json_path) {
 
     if (!is.null(rc$read1_with_adapter)) {
       r1_adapter <- rc$read1_with_adapter
-      cat("      Found read1_with_adapter:", r1_adapter, "\n")
     } else if (!is.null(rc$reads_read1_with_trimmed_adapter)) {
       r1_adapter <- rc$reads_read1_with_trimmed_adapter
-      cat("      Found reads_read1_with_trimmed_adapter:", r1_adapter, "\n")
-    } else {
-      cat("      No R1 adapter field found\n")
     }
 
     if (!is.null(rc$read2_with_adapter)) {
       r2_adapter <- rc$read2_with_adapter
-      cat("      Found read2_with_adapter:", r2_adapter, "\n")
     } else if (!is.null(rc$reads_read2_with_trimmed_adapter)) {
       r2_adapter <- rc$reads_read2_with_trimmed_adapter
-      cat("      Found reads_read2_with_trimmed_adapter:", r2_adapter, "\n")
-    } else {
-      cat("      No R2 adapter field found\n")
     }
 
     list(
@@ -203,6 +187,21 @@ for (sname in sample_names) {
   }
 }
 
+# Add reads_after_adapter and reads_after_primer (exact counts from JSON)
+qc_df$reads_after_adapter <- NA
+for (sname in sample_names) {
+  if (sname %in% names(adapter_stats) && !is.na(adapter_stats[[sname]]$output)) {
+    qc_df[sname, "reads_after_adapter"] <- adapter_stats[[sname]]$output
+  }
+}
+
+qc_df$reads_after_primer <- NA
+for (sname in sample_names) {
+  if (sname %in% names(primer_stats) && !is.na(primer_stats[[sname]]$output)) {
+    qc_df[sname, "reads_after_primer"] <- primer_stats[[sname]]$output
+  }
+}
+
 # Add adapter stats
 qc_df$adapter_fwd_pct <- NA
 qc_df$adapter_rev_pct <- NA
@@ -236,15 +235,31 @@ qc_df$dada2_merged <- dada2_summary[sample_names, "merged"]
 qc_df$dada2_nonchim <- dada2_summary[sample_names, "nonchim"]
 
 # Calculate percentage metrics
-qc_df$dada2_filter_pct <- ifelse(qc_df$reads_dada2_input > 0, 100 * qc_df$dada2_filtered / qc_df$reads_dada2_input, NA)
-qc_df$derep_pct_removed <- NA  # Placeholder - would need dereplicated counts from DADA2
-qc_df$denoise_pct_removed <- ifelse(qc_df$dada_f > 0 | qc_df$dada_r > 0,
-                                     100 * (qc_df$dada2_filtered - pmax(qc_df$dada_f, qc_df$dada_r, na.rm=TRUE)) / qc_df$dada2_filtered, NA)
+qc_df$pct_filtered_out <- ifelse(qc_df$reads_dada2_input > 0,
+  100 * (qc_df$reads_dada2_input - qc_df$dada2_filtered) / qc_df$reads_dada2_input, NA)
 qc_df$merge_pct <- ifelse(qc_df$dada2_filtered > 0, 100 * qc_df$dada2_merged / qc_df$dada2_filtered, NA)
-qc_df$chimera_pct <- ifelse(qc_df$dada2_merged > 0, 100 * qc_df$dada2_nonchim / qc_df$dada2_merged, NA)
+qc_df$pct_chimeric <- ifelse(qc_df$dada2_merged > 0,
+  100 * (qc_df$dada2_merged - qc_df$dada2_nonchim) / qc_df$dada2_merged, NA)
 
-# Placeholder for taxonomy assignment percentage (would need actual taxonomy data)
+# Placeholder for taxonomy assignment percentage (will be filled in from taxonomy file if available)
 qc_df$taxonomy_assigned_pct <- NA
+
+# Find and read taxonomy file to calculate taxonomy_assigned_pct
+taxa_files <- list.files(dada2_dir, pattern = "__combined_sequences_ASVtaxa_.*\\.txt$", full.names = TRUE)
+taxa_files <- taxa_files[!grepl("bootstrap", taxa_files)]
+if (length(taxa_files) == 1) {
+  tryCatch({
+    taxa_table <- read.table(taxa_files[1], header = TRUE, sep = "\t", check.names = FALSE, comment.char = "")
+    first_tax_col <- intersect(c("Kingdom", "Domain"), colnames(taxa_table))[1]
+    if (!is.na(first_tax_col)) {
+      asv_tax_pct <- 100 * sum(!is.na(taxa_table[[first_tax_col]])) / nrow(taxa_table)
+      # Set same value for all samples (per-run metric)
+      qc_df$taxonomy_assigned_pct <- asv_tax_pct
+    }
+  }, error = function(e) {
+    cat("Warning: Could not calculate taxonomy_assigned_pct:", e$message, "\n")
+  })
+}
 
 # ==============================================================================
 # WRITE QC SUMMARY FILE
@@ -262,27 +277,30 @@ cat("# Amplicon: ", amplicon, "\n")
 cat("#\n")
 cat("# COLUMN DESCRIPTIONS:\n")
 cat("#   reads_start:              Total input reads\n")
-cat("#   adapter_fwd_pct:          % of forward reads with adapter detected\n")
-cat("#   adapter_rev_pct:          % of reverse reads with adapter detected\n")
-cat("#   adapter_pct_removed:      % reads removed by adapter trimming\n")
+cat("#   adapter_fwd_pct:          % of forward reads with adapter sequence detected\n")
+cat("#   adapter_rev_pct:          % of reverse reads with adapter sequence detected\n")
+cat("#   adapter_pct_removed:      % reads removed by adapter trimming (typically 0% for step)\n")
+cat("#   reads_after_adapter:      Reads after adapter processing\n")
 cat("#   primer_fwd_pct:           % of forward reads with primer detected\n")
 cat("#   primer_rev_pct:           % of reverse reads with primer detected\n")
-cat("#   primer_pct_removed:       % reads removed by primer trimming\n")
+cat("#   primer_pct_removed:       % reads removed by primer trimming (--discard-untrimmed)\n")
+cat("#   reads_after_primer:       Reads after primer trimming\n")
 cat("#   reads_dada2_input:        Reads entering DADA2 denoising\n")
-cat("#   dada2_filter_pct:         % reads retained by quality filtering\n")
-cat("#   denoise_pct_removed:      % reads removed by denoising\n")
-cat("#   merge_pct:                % of denoised reads that merged successfully\n")
-cat("#   chimera_pct:              % of merged reads retained after chimera removal\n")
+cat("#   dada2_filtered:           Reads after DADA2 quality filtering\n")
+cat("#   pct_filtered_out:         % reads removed by DADA2 quality filtering\n")
+cat("#   merge_pct:                % of filtered reads that merged successfully\n")
+cat("#   pct_chimeric:             % of merged reads that were chimeric\n")
 cat("#   taxonomy_assigned_pct:    % of ASVs with taxonomy assignment\n")
 cat("#\n")
 cat("# EXPECTED VALUES (approximate):\n")
-cat("#   adapter_fwd/rev_pct:      typically 85-98% detected\n")
-cat("#   adapter_pct_removed:      typically 2-15% removed\n")
+cat("#   adapter_fwd/rev_pct:      variable (low for long amplicons >300bp; high for 16S/short)\n")
+cat("#   adapter_pct_removed:      typically 0% (trimming step, not discarding)\n")
 cat("#   primer_fwd/rev_pct:       typically 70-95% detected (18S-V4 R2 often 50-70%)\n")
 cat("#   primer_pct_removed:       typically 5-25% removed\n")
-cat("#   dada2_filter_pct:         typically 70-85% retained (< 50% suggests quality issues)\n")
+cat("#   pct_filtered_out:         typically 15-30% removed (70-85% retained)\n")
 cat("#   merge_pct:                16S: 75-95%, ITS: 60-85%, 18S-V4: 30-70%\n")
-cat("#   chimera_pct:              typically 85-98% retained (> 15% chimeric = concern)\n")
+cat("#   pct_chimeric:             typically 2-15% (85-98% retained)\n")
+cat("#   taxonomy_assigned_pct:    typically >90% if database matches samples\n")
 cat("#\n")
 
 sink()
@@ -402,37 +420,32 @@ tryCatch({
 cat("Generating read tracking figure...\n")
 
 tryCatch({
-  # Build read tracking data from all available columns
-  step_labels <- c("reads_start", "adapter_passing", "primer_passing", "reads_dada2_input", "dada2_filtered", "dada2_merged", "dada2_nonchim")
-  step_names <- c("Start", "Adapter\nRemoved", "Primer\nRemoved", "DADA2\nInput", "After\nFilter", "After\nMerge", "After\nChimera")
+  # Define all possible steps in order
+  step_defs <- list(
+    list(name = "Start",          col = "reads_start"),
+    list(name = "After Adapter",  col = "reads_after_adapter"),
+    list(name = "After Primer",   col = "reads_after_primer"),
+    list(name = "DADA2 Input",    col = "reads_dada2_input"),
+    list(name = "After Filter",   col = "dada2_filtered"),
+    list(name = "After Merge",    col = "dada2_merged"),
+    list(name = "After Chimera",  col = "dada2_nonchim")
+  )
 
-  step_data <- data.frame(step_label = character(), step_name = character(), mean_reads = numeric())
+  # Build step_data with parallel step_names_used vector
+  step_data <- data.frame(step_name = character(), mean_reads = numeric())
+  step_names_used <- character()
 
-  for (i in seq_along(step_labels)) {
-    col <- step_labels[i]
-
-    # Special handling for adapter_passing and primer_passing (calculate from input - removed)
-    if (col == "adapter_passing" && "reads_start" %in% colnames(qc_df) && "adapter_pct_removed" %in% colnames(qc_df)) {
-      vals <- qc_df$reads_start * (100 - qc_df$adapter_pct_removed) / 100
-    } else if (col == "primer_passing" && "adapter_passing" %in% colnames(qc_df) && "primer_pct_removed" %in% colnames(qc_df)) {
-      # Use previously calculated adapter_passing values
-      adapter_vals <- qc_df$reads_start * (100 - qc_df$adapter_pct_removed) / 100
-      vals <- adapter_vals * (100 - qc_df$primer_pct_removed) / 100
-    } else if (col %in% colnames(qc_df)) {
-      vals <- qc_df[[col]]
-    } else {
-      vals <- NA
-    }
-
-    if (any(!is.na(vals))) {
-      means <- mean(vals, na.rm = TRUE)
-      step_data <- rbind(step_data, data.frame(step_label = col, step_name = step_names[i], mean_reads = means))
+  for (s in step_defs) {
+    if (s$col %in% colnames(qc_df) && any(!is.na(qc_df[[s$col]]))) {
+      vals <- qc_df[[s$col]]
+      step_data <- rbind(step_data, data.frame(step_name = s$name, mean_reads = mean(vals, na.rm = TRUE)))
+      step_names_used <- c(step_names_used, s$name)
     }
   }
 
   if (nrow(step_data) > 0) {
-    # Create ggplot with better spacing
-    p <- ggplot(step_data, aes(x = factor(step_name, levels = step_names[1:nrow(step_data)]), y = mean_reads, fill = step_name)) +
+    # Create ggplot with better spacing, using step_names_used for proper factor levels
+    p <- ggplot(step_data, aes(x = factor(step_name, levels = step_names_used), y = mean_reads, fill = step_name)) +
       geom_bar(stat = "identity", color = "black", linewidth = 0.7) +
       theme_minimal() +
       theme(
