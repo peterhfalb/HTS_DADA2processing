@@ -326,7 +326,36 @@ rule combine_otu_taxonomy:
         """
 
 # ============================================================================
-# Step 7: Finalize outputs (copy to main dir, combine QC tables, write README)
+# Step 7: Generate OTU QC summary
+# ============================================================================
+
+rule generate_otu_qc_summary:
+    """Generate comprehensive OTU QC summary from all pipeline steps"""
+    input:
+        asv_table=OUTPUT_DIR + f"/03_dada2/{PROJECT_NAME}__combined_sequences_ASVtaxa_{DB_NAME}.txt",
+        centroids=OUTPUT_DIR + f"/05_otu/03_vsearch/{PROJECT_NAME}.centroids",
+        mumu_table=OUTPUT_DIR + f"/05_otu/04_mumu/{PROJECT_NAME}_mumu_curated.txt",
+        taxonomy=OUTPUT_DIR + f"/05_otu/05_taxonomy/Taxonomy_rdp_{AMPLICON}_combined.txt",
+    output:
+        qc_summary=OUTPUT_DIR + "/05_otu/otu_qc_summary.txt",
+    params:
+        output_dir=OUTPUT_DIR,
+        project=PROJECT_NAME,
+        run_itsx="1" if (RUN_ITSX and AMPLICON in ("ITS1", "ITS2")) else "0",
+        pipeline_dir=workflow.basedir,
+    log:
+        OUTPUT_DIR + "/.logs/generate_otu_qc_summary.log",
+    shell:
+        """
+        Rscript {params.pipeline_dir}/workflow/scripts/generate_otu_qc_summary.R \
+            {params.output_dir} \
+            {params.project} \
+            {params.run_itsx} \
+            2>&1 | tee {log}
+        """
+
+# ============================================================================
+# Step 8: Finalize outputs (copy to main dir, combine QC tables, write README)
 # ============================================================================
 
 rule finalize_outputs:
@@ -335,7 +364,7 @@ rule finalize_outputs:
         asv_table=OUTPUT_DIR + f"/03_dada2/{PROJECT_NAME}__combined_sequences_ASVtaxa_{DB_NAME}.txt",
         qc_per_sample=OUTPUT_DIR + "/04_QC/qc_summary.txt",
         **{f"otu_table": OUTPUT_DIR + f"/05_otu/{PROJECT_NAME}__OTUs_with_taxonomy_{DB_NAME}.txt"} if not SKIP_OTU else {},
-        **{f"otu_stats": OUTPUT_DIR + f"/05_otu/03_vsearch/otu_processing_summary.txt"} if not SKIP_OTU else {},
+        **{f"otu_qc_summary": OUTPUT_DIR + f"/05_otu/otu_qc_summary.txt"} if not SKIP_OTU else {},
     output:
         qc_main=OUTPUT_DIR + "/qc_summary.txt",
         readme=OUTPUT_DIR + "/README.txt",

@@ -79,44 +79,28 @@ if (file.exists(qc_per_sample_path)) {
 # Prepare output QC table (start with per-sample)
 qc_final <- qc_per_sample
 
-# Append OTU stats section if OTU was run
-otu_stats_path <- "05_otu/03_vsearch/otu_processing_summary.txt"
-if (!SKIP_OTU && file.exists(otu_stats_path)) {
-  cat("✓ Found OTU processing stats\n")
+# Append OTU QC summary if OTU was run
+otu_qc_path <- "05_otu/otu_qc_summary.txt"
+if (!SKIP_OTU && file.exists(otu_qc_path)) {
+  cat("✓ Found OTU QC summary\n")
 
-  # Read OTU stats (tab-separated, single row with header)
-  otu_stats <- read_tsv(otu_stats_path, show_col_types = FALSE)
-
-  # Append blank row and OTU stats section header
-  blank_row <- data.frame(matrix(NA, nrow = 1, ncol = ncol(qc_final)))
+  # Append blank line and OTU QC section
+  blank_row <- as.data.frame(matrix(NA_character_, nrow = 1, ncol = ncol(qc_final)))
   names(blank_row) <- names(qc_final)
-
   qc_final <- bind_rows(qc_final, blank_row)
 
-  # Add section header row (put "OTU_Processing_Summary" in first column, rest NA)
-  header_row <- data.frame(matrix(NA, nrow = 1, ncol = ncol(qc_final)))
-  names(header_row) <- names(qc_final)
-  header_row[[1]] <- "# OTU Processing Summary"
+  # Read OTU QC summary (Metric\tValue format)
+  otu_qc <- read_tsv(otu_qc_path, skip = 2, show_col_types = FALSE)  # skip comment lines
 
-  qc_final <- bind_rows(qc_final, header_row)
-
-  # Add OTU stats row (left-align with first column, rest fill with OTU stats)
-  # OTU stats columns: input_asvs, post_itsx, post_cluster, post_chimera, post_mumu, classified_otus
-  # We'll put them in the first 6 columns (after accounting for sample column which is first)
-  otu_stats_row <- data.frame(matrix(NA, nrow = 1, ncol = ncol(qc_final)))
-  names(otu_stats_row) <- names(qc_final)
-
-  # Place OTU stat values in the first columns (starting after any row label column)
-  otu_col_names <- names(otu_stats)
-  for (i in seq_along(otu_col_names)) {
-    if (i <= ncol(otu_stats_row)) {
-      otu_stats_row[[i]] <- otu_stats[[i, otu_col_names[i]]]
-    }
+  # Add each OTU metric as a data row
+  for (i in seq_len(nrow(otu_qc))) {
+    metric_row <- as.data.frame(matrix(NA_character_, nrow = 1, ncol = ncol(qc_final)))
+    names(metric_row) <- names(qc_final)
+    metric_row[[1]] <- paste(otu_qc[[i, 1]], otu_qc[[i, 2]], sep = ": ")
+    qc_final <- bind_rows(qc_final, metric_row)
   }
-
-  qc_final <- bind_rows(qc_final, otu_stats_row)
 } else if (!SKIP_OTU) {
-  cat("⚠  OTU processing stats file not found (non-critical if OTU pipeline is still running)\n")
+  cat("⚠  OTU QC summary file not found (non-critical if OTU pipeline is still running)\n")
 }
 
 # Write combined QC table
