@@ -170,8 +170,8 @@ rule vsearch_cluster:
 
         # Calculate and save OTU clustering statistics
         CHIMERAS_REMOVED=$((POST_CLUSTER - POST_CHIMERA))
-        PCT_CHIMERIC=$(awk "BEGIN {{printf \"%.1f\", ($CHIMERAS_REMOVED / $POST_CLUSTER) * 100}}")
-        PCT_ASVS_REMOVED=$(awk "BEGIN {{printf \"%.1f\", (($INPUT_ASVS - $POST_CLUSTER) / $INPUT_ASVS) * 100}}")
+        PCT_CHIMERIC=$(awk -v cr=$CHIMERAS_REMOVED -v pc=$POST_CLUSTER 'BEGIN {{printf "%.1f", (cr / pc) * 100}}')
+        PCT_ASVS_REMOVED=$(awk -v ia=$INPUT_ASVS -v pc=$POST_CLUSTER 'BEGIN {{printf "%.1f", ((ia - pc) / ia) * 100}}')
 
         # Save all counts to file before cleanup (needed by OTU QC summary script)
         echo "INPUT_ASVS=$INPUT_ASVS" > {params.project}_vsearch_counts.txt
