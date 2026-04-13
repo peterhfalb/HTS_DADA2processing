@@ -334,10 +334,10 @@ blank_row[,] <- NA
 qc_df_with_avg <- rbind(qc_df, blank_row, stringsAsFactors = FALSE)
 qc_df_with_avg <- rbind(qc_df_with_avg, avg_row, stringsAsFactors = FALSE)
 
-# Write the table with sample as a regular column
+# Write the table with sample as a regular column (na="" makes blank row truly blank)
 write.table(qc_df_with_avg,
   file = qc_summary_path,
-  sep = "\t", quote = FALSE, append = TRUE, col.names = TRUE, row.names = FALSE
+  sep = "\t", quote = FALSE, append = TRUE, col.names = TRUE, row.names = FALSE, na = ""
 )
 
 cat("QC summary written to:", qc_summary_path, "\n\n")
