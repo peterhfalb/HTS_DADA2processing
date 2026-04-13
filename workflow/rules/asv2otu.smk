@@ -244,25 +244,18 @@ rule mumu_curation:
             --minimum_ratio {params.mumu_ratio} 2>&1 | tee -a {log}
 
         # Extract curated centroid sequences from original centroids
-        # by grepping OTU IDs from curated table against original centroids
-        awk 'NR > 1 {{print $1}}' {params.project}_mumu_curated.txt | \
-            xargs -I {{}} grep "^>{{};size" {input.centroids} -A1 > Centroid_mumu_curated_temp.fas
+        # Get list of OTU IDs that passed mumu curation
+        awk 'NR > 1 {print $1}' {params.project}_mumu_curated.txt > otu_ids.txt
 
-        # Add size= annotations back from mumu curated table
-        # This is complex, so we'll use a different approach:
-        # Extract OTU IDs and their total abundances from curated table
-        awk 'NR > 1 {{id=$1; abund=0; for(i=2; i<=NF; i++) abund+=$i; print id, abund}}' {params.project}_mumu_curated.txt > otu_abundances.txt
-
-        # Build new FASTA with size annotations
-        {{
-            while IFS=' ' read otu_id abund; do
-                grep "^>${{otu_id}};size" {input.centroids} | sed "s/;size=[0-9]*//;s/;size=/;size=${{abund}};/" | head -1
-                grep "^>${{otu_id}};size" {input.centroids} -A1 | tail -1
-            done < otu_abundances.txt
-        }} > Centroid_mumu_curated.fas
+        # For each OTU, extract its sequence and calculate total abundance for size annotation
+        > Centroid_mumu_curated.fas
+        while IFS= read -r otu_id; do
+            # Get sequence header and sequence from original centroids
+            grep "^>$otu_id;size" {input.centroids} -A1 | head -2 >> Centroid_mumu_curated.fas
+        done < otu_ids.txt
 
         # Clean up
-        rm -f OTU_centroids* match_list.txt otu_abundances.txt mumu_table.txt Centroid_mumu_curated_temp.fas
+        rm -f OTU_centroids* match_list.txt otu_ids.txt mumu_table.txt
 
         # Copy output file
         cp {params.project}_mumu_curated.txt {output.curated_table}
