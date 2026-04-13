@@ -19,7 +19,9 @@ if (length(args) < 4) {
 OUTPUT_DIR  <- args[1]
 PROJECT     <- args[2]
 DB_NAME     <- args[3]
-SKIP_OTU    <- as.logical(as.numeric(args[4]))
+# Handle both Snakemake Python booleans ("True"/"False") and shell numbers ("0"/"1")
+skip_otu_str <- tolower(args[4])
+SKIP_OTU    <- skip_otu_str %in% c("true", "1", "yes")
 
 setwd(OUTPUT_DIR)
 
