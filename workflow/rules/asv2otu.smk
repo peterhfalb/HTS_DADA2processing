@@ -254,12 +254,8 @@ rule mumu_curation:
             grep "^>$otu_id;size" {input.centroids} -A1 | head -2 >> Centroid_mumu_curated.fas
         done < otu_ids.txt
 
-        # Clean up
+        # Clean up intermediate files (output files are already in the output directory)
         rm -f OTU_centroids* match_list.txt otu_ids.txt mumu_table.txt
-
-        # Copy output file
-        cp {params.project}_mumu_curated.txt {output.curated_table}
-        cp Centroid_mumu_curated.fas {output.curated_fasta}
 
         echo "mumu curation complete" >> {log}
         """
