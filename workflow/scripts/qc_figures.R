@@ -188,33 +188,33 @@ for (sname in sample_names) {
 }
 
 # Add reads_after_adapter and reads_after_primer (exact counts from JSON)
-qc_df$reads_after_adapter <- NA
-for (sname in sample_names) {
-  if (sname %in% names(adapter_stats) && !is.na(adapter_stats[[sname]]$output)) {
-    qc_df[sname, "reads_after_adapter"] <- adapter_stats[[sname]]$output
-  }
-}
+#qc_df$reads_after_adapter <- NA
+#for (sname in sample_names) {
+#  if (sname %in% names(adapter_stats) && !is.na(adapter_stats[[sname]]$output)) {
+#    qc_df[sname, "reads_after_adapter"] <- adapter_stats[[sname]]$output
+#  }
+#}
 
-qc_df$reads_after_primer <- NA
-for (sname in sample_names) {
-  if (sname %in% names(primer_stats) && !is.na(primer_stats[[sname]]$output)) {
-    qc_df[sname, "reads_after_primer"] <- primer_stats[[sname]]$output
-  }
-}
 
 # Add adapter stats
 qc_df$adapter_fwd_pct <- NA
 qc_df$adapter_rev_pct <- NA
-qc_df$adapter_pct_removed <- NA
 for (sname in sample_names) {
   if (sname %in% names(adapter_stats)) {
     qc_df[sname, "adapter_fwd_pct"] <- adapter_stats[[sname]]$pct_r1
     qc_df[sname, "adapter_rev_pct"] <- adapter_stats[[sname]]$pct_r2
-    qc_df[sname, "adapter_pct_removed"] <- adapter_stats[[sname]]$pct_removed
   }
 }
 
+
 # Add primer stats
+qc_df$reads_after_primer <- NA
+for (sname in sample_names) {
+  if (sname %in% names(primer_stats) && !is.na(primer_stats[[sname]]$output)) {
+   qc_df[sname, "reads_after_primer"] <- primer_stats[[sname]]$output
+  }
+}
+
 qc_df$primer_fwd_pct <- NA
 qc_df$primer_rev_pct <- NA
 qc_df$primer_pct_removed <- NA
@@ -228,18 +228,20 @@ for (sname in sample_names) {
 
 # Add DADA2 stats
 qc_df$reads_dada2_input <- dada2_summary[sample_names, "dada2_input"]
+
 qc_df$dada2_filtered <- dada2_summary[sample_names, "filtered"]
+qc_df$pct_filtered_out <- ifelse(qc_df$reads_dada2_input > 0,
+  100 * (qc_df$reads_dada2_input - qc_df$dada2_filtered) / qc_df$reads_dada2_input, NA)
+
 qc_df$dada_f <- dada2_summary[sample_names, "dada_f"]
 qc_df$dada_r <- dada2_summary[sample_names, "dada_r"]
 qc_df$dada2_merged <- dada2_summary[sample_names, "merged"]
-qc_df$dada2_nonchim <- dada2_summary[sample_names, "nonchim"]
-
-# Calculate percentage metrics
-qc_df$pct_filtered_out <- ifelse(qc_df$reads_dada2_input > 0,
-  100 * (qc_df$reads_dada2_input - qc_df$dada2_filtered) / qc_df$reads_dada2_input, NA)
 qc_df$merge_pct <- ifelse(qc_df$dada2_filtered > 0, 100 * qc_df$dada2_merged / qc_df$dada2_filtered, NA)
+
+qc_df$dada2_nonchim <- dada2_summary[sample_names, "nonchim"]
 qc_df$pct_chimeric <- ifelse(qc_df$dada2_merged > 0,
   100 * (qc_df$dada2_merged - qc_df$dada2_nonchim) / qc_df$dada2_merged, NA)
+
 
 # Placeholder for taxonomy assignment percentage (will be filled in from taxonomy file if available)
 qc_df$taxonomy_assigned_pct <- NA
@@ -276,25 +278,27 @@ cat("# Generated: ", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
 cat("# Amplicon: ", amplicon, "\n")
 cat("#\n")
 cat("# COLUMN DESCRIPTIONS:\n")
+cat("#   sample:                   Sample name (or 'average' for row means)\n")
 cat("#   reads_start:              Total input reads\n")
 cat("#   adapter_fwd_pct:          % of forward reads with adapter sequence detected\n")
 cat("#   adapter_rev_pct:          % of reverse reads with adapter sequence detected\n")
-cat("#   adapter_pct_removed:      % reads removed by adapter trimming (typically 0% for step)\n")
-cat("#   reads_after_adapter:      Reads after adapter processing\n")
+cat("#   reads_after_primer:       Reads after primer trimming\n")
 cat("#   primer_fwd_pct:           % of forward reads with primer detected\n")
 cat("#   primer_rev_pct:           % of reverse reads with primer detected\n")
 cat("#   primer_pct_removed:       % reads removed by primer trimming (--discard-untrimmed)\n")
-cat("#   reads_after_primer:       Reads after primer trimming\n")
 cat("#   reads_dada2_input:        Reads entering DADA2 denoising\n")
 cat("#   dada2_filtered:           Reads after DADA2 quality filtering\n")
 cat("#   pct_filtered_out:         % reads removed by DADA2 quality filtering\n")
+cat("#   dada_f:                   total forward reads\n")
+cat("#   dada_r:                   total reverse reads\n")
+cat("#   dada2_merged:             number of merged reads\n")
 cat("#   merge_pct:                % of filtered reads that merged successfully\n")
+cat("#   dada2_nonchim:            number of non-chimeric reads\n")
 cat("#   pct_chimeric:             % of merged reads that were chimeric\n")
 cat("#   taxonomy_assigned_pct:    % of ASVs with taxonomy assignment\n")
 cat("#\n")
 cat("# EXPECTED VALUES (approximate):\n")
 cat("#   adapter_fwd/rev_pct:      variable (low for long amplicons >300bp; high for 16S/short)\n")
-cat("#   adapter_pct_removed:      typically 0% (trimming step, not discarding)\n")
 cat("#   primer_fwd/rev_pct:       typically 70-95% detected (18S-V4 R2 often 50-70%)\n")
 cat("#   primer_pct_removed:       typically 5-25% removed\n")
 cat("#   pct_filtered_out:         typically 15-30% removed (70-85% retained)\n")
@@ -305,10 +309,31 @@ cat("#\n")
 
 sink()
 
-# Write the table
-write.table(qc_df,
+# Convert rownames to a "sample" column
+qc_df$sample <- rownames(qc_df)
+qc_df <- qc_df[, c("sample", setdiff(colnames(qc_df), "sample"))]  # Move sample to first column
+
+# Calculate averages for all numeric columns
+avg_row <- data.frame(sample = "average")
+for (col in colnames(qc_df)[-1]) {  # Skip "sample" column
+  if (is.numeric(qc_df[[col]])) {
+    avg_row[[col]] <- mean(qc_df[[col]], na.rm = TRUE)
+  } else {
+    avg_row[[col]] <- NA
+  }
+}
+
+# Ensure column order matches qc_df
+avg_row <- avg_row[, colnames(qc_df)]
+
+# Add blank row and average row
+qc_df_with_avg <- rbind(qc_df, data.frame(setNames(rep(NA, ncol(qc_df)), colnames(qc_df))))
+qc_df_with_avg <- rbind(qc_df_with_avg, avg_row)
+
+# Write the table with sample as a regular column
+write.table(qc_df_with_avg,
   file = qc_summary_path,
-  sep = "\t", quote = FALSE, append = TRUE, col.names = TRUE, row.names = TRUE
+  sep = "\t", quote = FALSE, append = TRUE, col.names = TRUE, row.names = FALSE
 )
 
 cat("QC summary written to:", qc_summary_path, "\n\n")
