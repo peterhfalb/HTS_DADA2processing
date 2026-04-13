@@ -22,12 +22,13 @@ rule prepare_otu_input:
         map=OUTPUT_DIR + "/05_otu/01_input/Map_file.csv",
     params:
         outdir=OUTPUT_DIR + "/05_otu/01_input",
+        pipeline_dir=workflow.basedir,
     log:
         OUTPUT_DIR + "/.logs/prepare_otu_input.log",
     shell:
         """
         mkdir -p {params.outdir}
-        Rscript workflow/scripts/prepare_otu_input.R {input.asv_table} {params.outdir} 2>&1 | tee {log}
+        Rscript {params.pipeline_dir}/workflow/scripts/prepare_otu_input.R {input.asv_table} {params.outdir} 2>&1 | tee {log}
         """
 
 # ============================================================================
@@ -93,6 +94,7 @@ rule vsearch_cluster:
         cluster_id=OTU_CLUSTER_ID,
         project=PROJECT_NAME,
         abund_table=OUTPUT_DIR + "/05_otu/01_input/asv_abundance_table.txt",
+        pipeline_dir=workflow.basedir,
     threads: workflow.cores
     log:
         OUTPUT_DIR + "/.logs/vsearch_cluster.log",
@@ -100,6 +102,7 @@ rule vsearch_cluster:
         """
         mkdir -p {params.outdir}
         cd {params.outdir}
+        PIPELINE_DIR={params.pipeline_dir}
 
         # Count input sequences
         INPUT_ASVS=$(grep -c "^>" {input.fasta})
@@ -160,7 +163,7 @@ rule vsearch_cluster:
             --uc {params.project}.uc 2>&1 | tee -a cluster.log
 
         # Step 6: Build OTU table using R script
-        Rscript workflow/scripts/build_otu_table.R \
+        Rscript $PIPELINE_DIR/workflow/scripts/build_otu_table.R \
             {params.project}.uc \
             {params.abund_table} \
             {params.project}.otutable
@@ -283,13 +286,14 @@ rule assign_otu_taxonomy:
         taxonomy_db=EFFECTIVE_TAXONOMY_DB,
         amplicon=AMPLICON,
         db_name=DB_NAME,
+        pipeline_dir=workflow.basedir,
     threads: workflow.cores
     log:
         OUTPUT_DIR + "/.logs/assign_otu_taxonomy.log",
     shell:
         """
         mkdir -p {params.outdir}
-        Rscript workflow/scripts/assign_otu_taxonomy.R \
+        Rscript {params.pipeline_dir}/workflow/scripts/assign_otu_taxonomy.R \
             {input.fasta} \
             {params.taxonomy_db} \
             {params.outdir} \
@@ -315,12 +319,13 @@ rule combine_otu_taxonomy:
         project=PROJECT_NAME,
         amplicon=AMPLICON,
         db_name=DB_NAME,
+        pipeline_dir=workflow.basedir,
     log:
         OUTPUT_DIR + "/.logs/combine_otu_taxonomy.log",
     shell:
         """
         mkdir -p {params.outdir}
-        Rscript workflow/scripts/combine_otu_taxonomy.R \
+        Rscript {params.pipeline_dir}/workflow/scripts/combine_otu_taxonomy.R \
             {params.project} \
             {params.amplicon} \
             {input.otu_table} \
@@ -349,11 +354,12 @@ rule finalize_outputs:
         project=PROJECT_NAME,
         db_name=DB_NAME,
         skip_otu=SKIP_OTU,
+        pipeline_dir=workflow.basedir,
     log:
         OUTPUT_DIR + "/.logs/finalize_outputs.log",
     shell:
         """
-        Rscript workflow/scripts/finalize_outputs.R \
+        Rscript {params.pipeline_dir}/workflow/scripts/finalize_outputs.R \
             {params.output_dir} \
             {params.project} \
             {params.db_name} \
