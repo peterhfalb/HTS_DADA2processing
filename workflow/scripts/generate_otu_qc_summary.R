@@ -48,42 +48,38 @@ if (RUN_ITSX) {
   }
 }
 
-# 3. After clustering (before chimera check)
+# 3-5. Read counts from vsearch_cluster rule (clustering, chimera removal, percentages)
 vsearch_dir <- file.path(otu_dir, "03_vsearch")
-clustered_fasta <- file.path(vsearch_dir, "clustered.fasta")
-if (file.exists(clustered_fasta)) {
-  # We need to count from the .uc file or the centroids
-  # The easiest is to count from the .uc file - each S record is a centroid
-  uc_file <- file.path(vsearch_dir, paste0(PROJECT, ".uc"))
-  if (file.exists(uc_file)) {
-    post_cluster <- system(paste("grep '^S' ", uc_file, "| wc -l"), intern = TRUE)
-    post_cluster <- as.numeric(post_cluster)
-    cat("After clustering: ", post_cluster, "\n")
-  } else {
-    cat("Warning: .uc file not found for cluster count\n")
-    post_cluster <- NA
-  }
-} else {
-  cat("Warning: clustered.fasta not found\n")
-  post_cluster <- NA
-}
+vsearch_counts_file <- file.path(vsearch_dir, paste0(PROJECT, "_vsearch_counts.txt"))
 
-# 4. After chimera removal
-nochim_fasta <- file.path(vsearch_dir, "nochim.fasta")
-if (file.exists(nochim_fasta)) {
-  post_chimera <- system(paste("grep -c '^>'", nochim_fasta), intern = TRUE)
-  post_chimera <- as.numeric(post_chimera)
-  cat("After chimera removal: ", post_chimera, "\n")
-} else {
-  cat("Warning: nochim.fasta not found\n")
-  post_chimera <- NA
-}
-
-# Chimeras removed
+post_cluster <- NA
 chimeras_removed <- NA
-if (!is.na(post_cluster) && !is.na(post_chimera)) {
-  chimeras_removed <- post_cluster - post_chimera
-  cat("Chimeras removed: ", chimeras_removed, "\n")
+post_chimera <- NA
+pct_chimeric <- NA
+pct_asvs_removed <- NA
+
+if (file.exists(vsearch_counts_file)) {
+  # Read key=value format file
+  counts <- readLines(vsearch_counts_file)
+  for (line in counts) {
+    parts <- strsplit(line, "=")[[1]]
+    if (length(parts) == 2) {
+      key <- trimws(parts[1])
+      value <- trimws(parts[2])
+      if (key == "POST_CLUSTER") post_cluster <- as.numeric(value)
+      if (key == "POST_CHIMERA") post_chimera <- as.numeric(value)
+      if (key == "CHIMERAS_REMOVED") chimeras_removed <- as.numeric(value)
+      if (key == "PCT_CHIMERIC") pct_chimeric <- as.numeric(value)
+      if (key == "PCT_ASVS_REMOVED") pct_asvs_removed <- as.numeric(value)
+    }
+  }
+  if (!is.na(post_cluster)) cat("After clustering: ", post_cluster, "\n")
+  if (!is.na(chimeras_removed)) cat("Chimeras removed: ", chimeras_removed, "\n")
+  if (!is.na(post_chimera)) cat("After chimera removal: ", post_chimera, "\n")
+  if (!is.na(pct_chimeric)) cat("% Chimeric: ", pct_chimeric, "%\n")
+  if (!is.na(pct_asvs_removed)) cat("% ASVs removed by clustering: ", pct_asvs_removed, "%\n")
+} else {
+  cat("Warning: VSEARCH counts file not found\n")
 }
 
 # 5. Before mumu curation
@@ -100,32 +96,42 @@ if (file.exists(otutable_path)) {
 # 6. After mumu curation
 mumu_dir <- file.path(otu_dir, "04_mumu")
 mumu_table <- file.path(mumu_dir, paste0(PROJECT, "_mumu_curated.txt"))
+otus_post_mumu <- NA
+otus_removed_mumu <- NA
+pct_removed_mumu <- NA
+
 if (file.exists(mumu_table)) {
   otus_post_mumu <- system(paste("tail -n +2", mumu_table, "| wc -l"), intern = TRUE)
   otus_post_mumu <- as.numeric(otus_post_mumu)
   cat("OTUs after mumu: ", otus_post_mumu, "\n")
 } else {
   cat("Warning: mumu curated table not found\n")
-  otus_post_mumu <- NA
 }
 
-# OTUs removed by mumu
-otus_removed_mumu <- NA
+# OTUs removed by mumu and percentage
 if (!is.na(otus_pre_mumu) && !is.na(otus_post_mumu)) {
   otus_removed_mumu <- otus_pre_mumu - otus_post_mumu
-  cat("OTUs removed by mumu: ", otus_removed_mumu, "\n")
+  pct_removed_mumu <- round((otus_removed_mumu / otus_pre_mumu) * 100, 1)
+  cat("OTUs removed by mumu: ", otus_removed_mumu, " (", pct_removed_mumu, "%)\n")
 }
 
 # 7. After taxonomy assignment
 tax_dir <- file.path(otu_dir, "05_taxonomy")
 tax_file <- file.path(tax_dir, list.files(tax_dir, pattern = "_combined.txt$")[1])
+otus_with_tax <- NA
+pct_with_tax <- NA
+
 if (!is.na(tax_file) && file.exists(tax_file)) {
   otus_with_tax <- system(paste("tail -n +2", tax_file, "| wc -l"), intern = TRUE)
   otus_with_tax <- as.numeric(otus_with_tax)
-  cat("OTUs with taxonomy: ", otus_with_tax, "\n")
+  if (!is.na(otus_post_mumu)) {
+    pct_with_tax <- round((otus_with_tax / otus_post_mumu) * 100, 1)
+    cat("OTUs with taxonomy: ", otus_with_tax, " (", pct_with_tax, "%)\n")
+  } else {
+    cat("OTUs with taxonomy: ", otus_with_tax, "\n")
+  }
 } else {
   cat("Warning: taxonomy file not found\n")
-  otus_with_tax <- NA
 }
 
 # ============================================================================
@@ -135,7 +141,7 @@ if (!is.na(tax_file) && file.exists(tax_file)) {
 output_file <- file.path(otu_dir, "otu_qc_summary.txt")
 
 summary_lines <- c(
-  "# OTU QC Summary",
+  "# ASV to OTU QC Summary",
   paste("# Generated: ", format(Sys.time(), "%Y-%m-%d %H:%M:%S")),
   "",
   "Metric\tValue",
@@ -147,11 +153,19 @@ if (!is.na(post_itsx)) {
 }
 
 if (!is.na(post_cluster)) {
-  summary_lines <- c(summary_lines, paste("After clustering (0.97 identity)", post_cluster, sep = "\t"))
+  summary_lines <- c(summary_lines, paste("OTUs after clustering (0.97 identity)", post_cluster, sep = "\t"))
+}
+
+if (!is.na(pct_asvs_removed)) {
+  summary_lines <- c(summary_lines, paste("% ASVs removed by clustering", paste0(pct_asvs_removed, "%"), sep = "\t"))
 }
 
 if (!is.na(chimeras_removed)) {
   summary_lines <- c(summary_lines, paste("Chimeras removed", chimeras_removed, sep = "\t"))
+}
+
+if (!is.na(pct_chimeric)) {
+  summary_lines <- c(summary_lines, paste("% Chimeric sequences", paste0(pct_chimeric, "%"), sep = "\t"))
 }
 
 if (!is.na(post_chimera)) {
@@ -162,12 +176,20 @@ if (!is.na(otus_removed_mumu)) {
   summary_lines <- c(summary_lines, paste("OTUs removed by mumu", otus_removed_mumu, sep = "\t"))
 }
 
+if (!is.na(pct_removed_mumu)) {
+  summary_lines <- c(summary_lines, paste("% OTUs removed by mumu", paste0(pct_removed_mumu, "%"), sep = "\t"))
+}
+
 if (!is.na(otus_post_mumu)) {
   summary_lines <- c(summary_lines, paste("Final OTU count (post-mumu)", otus_post_mumu, sep = "\t"))
 }
 
 if (!is.na(otus_with_tax)) {
-  summary_lines <- c(summary_lines, paste("OTUs with taxonomy assigned", otus_with_tax, sep = "\t"))
+  if (!is.na(pct_with_tax)) {
+    summary_lines <- c(summary_lines, paste("OTUs with taxonomy assigned", paste0(otus_with_tax, " (", pct_with_tax, "%)"), sep = "\t"))
+  } else {
+    summary_lines <- c(summary_lines, paste("OTUs with taxonomy assigned", otus_with_tax, sep = "\t"))
+  }
 }
 
 writeLines(summary_lines, output_file)

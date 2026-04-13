@@ -168,19 +168,24 @@ rule vsearch_cluster:
             {params.abund_table} \
             {params.project}.otutable
 
-        # Count classified OTUs (non-header lines in otutable)
-        POST_MUMU=$(wc -l < {params.project}.otutable)
-        POST_MUMU=$((POST_MUMU - 1))  # subtract header line
+        # Calculate and save OTU clustering statistics
+        CHIMERAS_REMOVED=$((POST_CLUSTER - POST_CHIMERA))
+        PCT_CHIMERIC=$(awk "BEGIN {{printf \"%.1f\", ($CHIMERAS_REMOVED / $POST_CLUSTER) * 100}}")
+        PCT_ASVS_REMOVED=$(awk "BEGIN {{printf \"%.1f\", (($INPUT_ASVS - $POST_CLUSTER) / $INPUT_ASVS) * 100}}")
 
-        # Write OTU processing summary
-        echo -e "input_asvs\\tpost_itsx\\tpost_cluster\\tpost_chimera\\tpost_mumu\\tclassified_otus" > {params.project}_processing_summary.txt
-        echo -e "$INPUT_ASVS\\t$POST_ITSX\\t$POST_CLUSTER\\t$POST_CHIMERA\\t$POST_MUMU\\t$POST_MUMU" >> {params.project}_processing_summary.txt
+        # Save all counts to file before cleanup (needed by OTU QC summary script)
+        echo "INPUT_ASVS=$INPUT_ASVS" > {params.project}_vsearch_counts.txt
+        echo "POST_CLUSTER=$POST_CLUSTER" >> {params.project}_vsearch_counts.txt
+        echo "CHIMERAS_REMOVED=$CHIMERAS_REMOVED" >> {params.project}_vsearch_counts.txt
+        echo "POST_CHIMERA=$POST_CHIMERA" >> {params.project}_vsearch_counts.txt
+        echo "PCT_CHIMERIC=$PCT_CHIMERIC" >> {params.project}_vsearch_counts.txt
+        echo "PCT_ASVS_REMOVED=$PCT_ASVS_REMOVED" >> {params.project}_vsearch_counts.txt
 
         # Clean up intermediate files
         rm -f sorted.fasta clustered.fasta nochim.fasta {params.project}.uc
 
-        # Copy files to output
-        cp {params.project}_processing_summary.txt {output.stats}
+        # Copy counts file to output
+        cp {params.project}_vsearch_counts.txt {output.stats}
 
         echo "VSEARCH clustering complete" >> cluster.log
         """

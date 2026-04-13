@@ -84,10 +84,16 @@ otu_qc_path <- "05_otu/otu_qc_summary.txt"
 if (!SKIP_OTU && file.exists(otu_qc_path)) {
   cat("✓ Found OTU QC summary\n")
 
-  # Append blank line and OTU QC section
+  # Append blank line, section header, and OTU QC section
   blank_row <- as.data.frame(matrix(NA_character_, nrow = 1, ncol = ncol(qc_final)))
   names(blank_row) <- names(qc_final)
   qc_final <- bind_rows(qc_final, blank_row)
+
+  # Add section header
+  header_row <- as.data.frame(matrix(NA_character_, nrow = 1, ncol = ncol(qc_final)))
+  names(header_row) <- names(qc_final)
+  header_row[[1]] <- "# ASV to OTU QC Summary"
+  qc_final <- bind_rows(qc_final, header_row)
 
   # Read OTU QC summary (Metric\tValue format)
   otu_qc <- read_tsv(otu_qc_path, skip = 2, show_col_types = FALSE)  # skip comment lines
