@@ -326,9 +326,13 @@ for (col in colnames(qc_df)[-1]) {  # Skip "sample" column
 # Ensure column order matches qc_df
 avg_row <- avg_row[, colnames(qc_df)]
 
+# Create blank row with proper column types (copy structure from qc_df, then set all to NA)
+blank_row <- qc_df[1, , drop = FALSE]
+blank_row[,] <- NA
+
 # Add blank row and average row
-qc_df_with_avg <- rbind(qc_df, data.frame(setNames(rep(NA, ncol(qc_df)), colnames(qc_df))))
-qc_df_with_avg <- rbind(qc_df_with_avg, avg_row)
+qc_df_with_avg <- rbind(qc_df, blank_row, stringsAsFactors = FALSE)
+qc_df_with_avg <- rbind(qc_df_with_avg, avg_row, stringsAsFactors = FALSE)
 
 # Write the table with sample as a regular column
 write.table(qc_df_with_avg,
