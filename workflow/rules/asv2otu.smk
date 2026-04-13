@@ -276,6 +276,7 @@ rule assign_otu_taxonomy:
         amplicon=AMPLICON,
         db_name=DB_NAME,
         pipeline_dir=workflow.basedir,
+        output_base=OUTPUT_DIR + f"/05_otu/05_taxonomy/Taxonomy_rdp_{AMPLICON}",
     threads: workflow.cores
     log:
         OUTPUT_DIR + "/.logs/assign_otu_taxonomy.log",
@@ -285,7 +286,7 @@ rule assign_otu_taxonomy:
         Rscript {params.pipeline_dir}/workflow/scripts/assign_otu_taxonomy.R \
             {input.fasta} \
             {params.taxonomy_db} \
-            {params.outdir} \
+            {params.output_base}.txt \
             {params.amplicon} \
             {params.db_name} \
             2>&1 | tee {log}
