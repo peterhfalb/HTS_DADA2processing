@@ -245,7 +245,7 @@ rule mumu_curation:
 
         # Extract curated centroid sequences from original centroids
         # Get list of OTU IDs that passed mumu curation
-        awk 'NR > 1 {print $1}' {params.project}_mumu_curated.txt > otu_ids.txt
+        awk 'NR > 1 {{print $1}}' {params.project}_mumu_curated.txt > otu_ids.txt
 
         # For each OTU, extract its sequence and calculate total abundance for size annotation
         > Centroid_mumu_curated.fas
