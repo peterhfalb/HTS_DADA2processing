@@ -24,6 +24,13 @@ TAXONOMY_DB_OVERRIDE = config.get("taxonomy_db_override", "")
 FWD_PRIMER_OVERRIDE = config.get("fwd_primer_override", "")
 REV_PRIMER_OVERRIDE = config.get("rev_primer_override", "")
 
+# OTU pipeline configuration
+SKIP_OTU        = config.get("skip_otu", "0") == "1"
+RUN_ITSX        = config.get("run_itsx", "0") == "1"
+OTU_CLUSTER_ID  = config.get("otu_cluster_id", "0.97")
+MUMU_BLAST_ID   = config.get("mumu_blast_id", "84")
+MUMU_RATIO      = config.get("mumu_ratio", "1")
+
 # Primer sequences (forward and reverse) per amplicon type
 PRIMERS = {
     "16S-V4": {
@@ -89,12 +96,17 @@ EFFECTIVE_REV = REV_PRIMER_OVERRIDE if REV_PRIMER_OVERRIDE else PRIMERS[AMPLICON
 # ============================================================================
 
 rule all:
-    """Final target: DADA2 processing complete"""
+    """Final target: DADA2 + OTU processing complete"""
     input:
+        # ASV outputs (always)
         OUTPUT_DIR + f"/03_dada2/{PROJECT_NAME}__combined_sequences_ASVtaxa_{DB_NAME}.txt",
         OUTPUT_DIR + f"/03_dada2/{PROJECT_NAME}__combined_sequences_ASVtaxa_bootstrap_{DB_NAME}.txt",
         OUTPUT_DIR + "/03_dada2/README.txt",
-        OUTPUT_DIR + "/04_QC/qc_summary.txt"
+        OUTPUT_DIR + "/04_QC/qc_summary.txt",
+        # Main directory summary files (always)
+        OUTPUT_DIR + "/qc_summary.txt",
+        OUTPUT_DIR + "/README.txt"
 
 include: "workflow/rules/cutadapt.smk"
 include: "workflow/rules/dada2.smk"
+include: "workflow/rules/asv2otu.smk"

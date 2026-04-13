@@ -20,6 +20,11 @@ Optional arguments:
   --fwd-primer SEQUENCE     Override forward primer for this amplicon (DNA string)
   --rev-primer SEQUENCE     Override reverse primer for this amplicon (DNA string)
   --project-name NAME       Project name for output file naming (default: basename of output-dir)
+  --skip-otu                Skip OTU clustering pipeline (default: run OTU pipeline)
+  --run-itsx                Run ITSx extraction (ITS1/ITS2 only; default: off)
+  --otu-cluster-id ID       VSEARCH clustering identity (default: 0.97)
+  --mumu-blast-id PCT       BLAST identity % for mumu (default: 94 for 16S-V4, 84 for others)
+  --mumu-ratio RATIO        mumu minimum_ratio (default: 100 for 16S-V4, 1 for others)
   --jobs JOBS               Max parallel Snakemake jobs (default: 16)
   --help                    Show this help message
 
@@ -42,6 +47,11 @@ TAXONOMY_DB_OVERRIDE=""
 FWD_PRIMER_OVERRIDE=""
 REV_PRIMER_OVERRIDE=""
 PROJECT_NAME=""
+SKIP_OTU=0
+RUN_ITSX=0
+OTU_CLUSTER_ID="0.97"
+MUMU_BLAST_ID=""
+MUMU_RATIO=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -86,6 +96,26 @@ while [[ $# -gt 0 ]]; do
             PROJECT_NAME="$2"
             shift 2
             ;;
+        --skip-otu)
+            SKIP_OTU=1
+            shift 1
+            ;;
+        --run-itsx)
+            RUN_ITSX=1
+            shift 1
+            ;;
+        --otu-cluster-id)
+            OTU_CLUSTER_ID="$2"
+            shift 2
+            ;;
+        --mumu-blast-id)
+            MUMU_BLAST_ID="$2"
+            shift 2
+            ;;
+        --mumu-ratio)
+            MUMU_RATIO="$2"
+            shift 2
+            ;;
         --help)
             show_usage
             ;;
@@ -108,6 +138,14 @@ if [[ ! " ${valid_amplicons[@]} " =~ " ${AMPLICON} " ]]; then
     echo "Error: Invalid amplicon type '${AMPLICON}'"
     echo "Valid options: ${valid_amplicons[*]}"
     exit 1
+fi
+
+# Resolve mumu defaults based on amplicon type
+if [[ -z "$MUMU_BLAST_ID" ]]; then
+    [[ "$AMPLICON" == "16S-V4" ]] && MUMU_BLAST_ID="94" || MUMU_BLAST_ID="84"
+fi
+if [[ -z "$MUMU_RATIO" ]]; then
+    [[ "$AMPLICON" == "16S-V4" ]] && MUMU_RATIO="100" || MUMU_RATIO="1"
 fi
 
 # Validate quality
@@ -223,6 +261,8 @@ set +u  # Temporarily disable strict mode for conda/mamba
 module load miniforge/24.3
 module load cutadapt/5.0
 module load snakemake
+module load blast-plus/2.13.0-gcc-8.2.0-vo4mr4d 2>/dev/null || true
+module load gcc/13.1.0-5z64cho 2>/dev/null || true
 CONDA_BASE=$(conda info --base 2>/dev/null) || { echo "ERROR: miniforge not found"; exit 1; }
 source "$CONDA_BASE/etc/profile.d/conda.sh"
 
@@ -401,6 +441,11 @@ project_name: "$PROJECT_NAME"
 taxonomy_db_override: "$TAXONOMY_DB_OVERRIDE"
 fwd_primer_override: "$FWD_PRIMER_OVERRIDE"
 rev_primer_override: "$REV_PRIMER_OVERRIDE"
+skip_otu: "$SKIP_OTU"
+run_itsx: "$RUN_ITSX"
+otu_cluster_id: "$OTU_CLUSTER_ID"
+mumu_blast_id: "$MUMU_BLAST_ID"
+mumu_ratio: "$MUMU_RATIO"
 
 samples:
 $(for sample in "${SAMPLES[@]}"; do echo "  - $sample"; done)
@@ -458,6 +503,13 @@ DISPLAY_REV="${REV_PRIMER_OVERRIDE:-$(
 
 echo "Fwd primer:       $DISPLAY_FWD"
 echo "Rev primer:       $DISPLAY_REV"
+echo ""
+echo "OTU clustering:   $([ "$SKIP_OTU" -eq 1 ] && echo 'disabled' || echo "enabled (${OTU_CLUSTER_ID} identity)")"
+if [ "$SKIP_OTU" -eq 0 ]; then
+    echo "ITSx extraction:  $([ "$RUN_ITSX" -eq 1 ] && echo 'enabled' || echo 'disabled')"
+    echo "mumu BLAST ID:    ${MUMU_BLAST_ID}%"
+    echo "mumu ratio:       ${MUMU_RATIO}"
+fi
 
 echo ""
 echo "Submit job with:"

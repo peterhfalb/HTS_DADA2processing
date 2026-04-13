@@ -201,6 +201,39 @@ else
     exit 1
 fi
 
+# ==============================================================================
+# SETTING UP MUMU
+# ==============================================================================
+echo ""
+echo "=========================================="
+echo "SETTING UP MUMU"
+echo "=========================================="
+echo ""
+
+MUMU_DIR="$HOME/packages/mumu"
+MUMU_BIN="$MUMU_DIR/mumu"
+
+if [[ -f "$MUMU_BIN" ]]; then
+    echo "✓ mumu already compiled at $MUMU_BIN"
+else
+    echo "Compiling mumu from source..."
+    set +u
+    module load gcc/13.1.0-5z64cho 2>/dev/null || echo "WARNING: gcc/13.1.0 not available"
+    set -u
+    mkdir -p "$(dirname "$MUMU_DIR")"
+    git clone https://github.com/frederic-mahe/mumu.git "$MUMU_DIR" 2>&1
+    cd "$MUMU_DIR" && make 2>&1
+    cd "$PIPELINE_DIR"
+    if [[ -f "$MUMU_BIN" ]]; then
+        echo "✓ mumu compiled at $MUMU_BIN"
+    else
+        echo "✗ mumu compilation failed"
+        echo "  You can try manually with:"
+        echo "  cd $MUMU_DIR && make"
+        exit 1
+    fi
+fi
+
 # Summary
 echo ""
 echo "=========================================="

@@ -9,4 +9,13 @@ dependencies:
   - r-base>=4.4
   - r-jsonlite
   - r-ggplot2
+  - vsearch
+  - itsx
+  - r-dplyr
+  - r-tidyr
+  - r-readr
+  - r-tibble
+  - r-purrr
+  - r-stringr
   # Note: cutadapt loaded via system module (cutadapt/5.0)
+  # Note: blast-plus and mumu handled separately (system module and custom compile)
