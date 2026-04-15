@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # QC figures and stats generation for DADA2 pipeline
-# Usage: Rscript qc_figures.R <qc_outdir> <amplicon> <dada2_summary_path> <dada2_dir> <primer_trimmed_dir>
+# Usage: Rscript qc_figures.R <qc_outdir> <amplicon> <platform> <dada2_summary_path> <dada2_dir> <primer_trimmed_dir>
 
 library(dada2)
 library(jsonlite)
@@ -8,20 +8,22 @@ library(ggplot2)
 
 # Parse command-line arguments
 args <- commandArgs(trailingOnly = TRUE)
-if (length(args) < 5) {
-  stop("Usage: Rscript qc_figures.R <qc_outdir> <amplicon> <dada2_summary_path> <dada2_dir> <primer_trimmed_dir>")
+if (length(args) < 6) {
+  stop("Usage: Rscript qc_figures.R <qc_outdir> <amplicon> <platform> <dada2_summary_path> <dada2_dir> <primer_trimmed_dir>")
 }
 
 qc_outdir <- args[1]
 amplicon <- args[2]
-dada2_summary_path <- args[3]
-dada2_dir <- args[4]
-primer_trimmed_dir <- args[5]
+platform <- tolower(args[3])
+dada2_summary_path <- args[4]
+dada2_dir <- args[5]
+primer_trimmed_dir <- args[6]
 
 cat("QC Figures Generation\n")
 cat("====================\n")
 cat("QC output dir:        ", qc_outdir, "\n")
 cat("Amplicon type:        ", amplicon, "\n")
+cat("Platform:             ", platform, "\n")
 cat("DADA2 summary:        ", dada2_summary_path, "\n")
 cat("DADA2 dir:            ", dada2_dir, "\n")
 cat("Primer-trimmed dir:   ", primer_trimmed_dir, "\n\n")
@@ -30,9 +32,62 @@ cat("Primer-trimmed dir:   ", primer_trimmed_dir, "\n\n")
 dir.create(file.path(qc_outdir, "figures"), showWarnings = FALSE, recursive = TRUE)
 
 # ==============================================================================
+# PARSE TRIMMOMATIC LOGS (for Aviti adapter trimming)
+# ==============================================================================
+parse_trimmomatic_log <- function(log_path) {
+  tryCatch({
+    lines <- readLines(log_path)
+    # Trimmomatic log format: "TrimmomaticPE: Processed 1000000 paired reads in 50.23 seconds (19882.15 reads/sec)"
+    # Extract pairs processed and various outcomes
+
+    # Look for the main summary line
+    summary_line <- grep("TrimmomaticPE:", lines, value = TRUE)
+
+    if (length(summary_line) == 0) {
+      return(list(input = NA, output = NA, pct_removed = NA, pct_r1 = NA, pct_r2 = NA))
+    }
+
+    summary_line <- summary_line[length(summary_line)]  # Use last match if multiple
+
+    # Extract input reads: "Processed X paired reads"
+    input_match <- regexpr("Processed\\s+([0-9]+)\\s+paired", summary_line)
+    input_reads <- NA
+    if (input_match > 0) {
+      input_reads <- as.numeric(sub("^.*Processed\\s+([0-9]+).*", "\\1", summary_line))
+    }
+
+    # Parse the per-read statistics to get survival count
+    # Lines with format: "   Both surviving: 1000 (100.00%)"
+    both_surviving <- grep("Both surviving", lines, value = TRUE)
+    output_reads <- NA
+    if (length(both_surviving) > 0) {
+      both_line <- both_surviving[length(both_surviving)]
+      output_match <- regexpr("([0-9]+)\\s+\\(", both_line)
+      if (output_match > 0) {
+        output_reads <- as.numeric(sub("^.*\\s+([0-9]+)\\s+\\(.*", "\\1", both_line))
+      }
+    }
+
+    list(
+      input = input_reads,
+      output = output_reads,
+      r1_with_adapter = NA,
+      r2_with_adapter = NA,
+      pct_r1 = NA,
+      pct_r2 = NA,
+      pct_removed = ifelse(!is.na(input_reads) && !is.na(output_reads) && input_reads > 0,
+                           100 * (input_reads - output_reads) / input_reads, NA)
+    )
+  }, error = function(e) {
+    cat("      ERROR:", e$message, "\n")
+    list(input = NA, output = NA, r1_with_adapter = NA, r2_with_adapter = NA, pct_r1 = NA, pct_r2 = NA, pct_removed = NA)
+  })
+}
+
+# ==============================================================================
 # PARSE CUTADAPT JSON FILES
 # ==============================================================================
-cat("Parsing cutadapt JSON files...\n")
+cat("Parsing trimming data...\n")
 
 parse_cutadapt_json <- function(json_path) {
   tryCatch({
@@ -81,42 +136,72 @@ parse_cutadapt_json <- function(json_path) {
   })
 }
 
-# Parse adapter JSONs
+# Parse adapter logs (format depends on platform)
 base_output_dir <- dirname(primer_trimmed_dir)
 cat("Base output directory:", base_output_dir, "\n")
 
-adapter_json_dir <- file.path(base_output_dir, "01_adapter", "01_logs")
-cat("Looking for adapter JSONs in:", adapter_json_dir, "\n")
-cat("  Directory exists:", dir.exists(adapter_json_dir), "\n")
-
-if (dir.exists(adapter_json_dir)) {
-  all_files <- list.files(adapter_json_dir)
-  cat("  All files in directory:", paste(all_files, collapse=", "), "\n")
-}
-
-adapter_jsons <- list.files(adapter_json_dir, pattern = "^cutadapt\\..*\\.json$", full.names = TRUE)
-cat("  Found", length(adapter_jsons), "adapter JSON files matching pattern\n")
-
-# Also try alternative patterns
-if (length(adapter_jsons) == 0) {
-  cat("  Trying alternative pattern *.json...\n")
-  adapter_jsons <- list.files(adapter_json_dir, pattern = "\\.json$", full.names = TRUE)
-  cat("  Found", length(adapter_jsons), "JSON files with *.json pattern\n")
-}
+adapter_log_dir <- file.path(base_output_dir, "01_adapter", "01_logs")
+cat("Looking for adapter logs in:", adapter_log_dir, "\n")
+cat("  Directory exists:", dir.exists(adapter_log_dir), "\n")
 
 adapter_stats <- list()
-for (json_file in adapter_jsons) {
-  # Extract sample name, removing cutadapt prefix and _S\d+ Illumina index suffix
-  base_name <- sub("^cutadapt\\.", "", sub("\\.json$", "", basename(json_file)))
-  sample_name <- sub("_S\\d+$", "", base_name)  # Remove _S123 suffix
-  cat("  Parsing:", basename(json_file), "-> sample:", sample_name, "(from: ", base_name, ")\n")
-  stats <- parse_cutadapt_json(json_file)
-  adapter_stats[[sample_name]] <- stats
-  cat("    Extracted: input=", stats$input, " output=", stats$output, " pct_removed=", stats$pct_removed, "\n")
+
+if (platform == "aviti") {
+  cat("Platform is Aviti: looking for Trimmomatic logs\n")
+  if (dir.exists(adapter_log_dir)) {
+    all_files <- list.files(adapter_log_dir)
+    cat("  All files in directory:", paste(all_files, collapse=", "), "\n")
+  }
+
+  adapter_logs <- list.files(adapter_log_dir, pattern = "_trimmomatic_pass1\\.log\\.txt$", full.names = TRUE)
+  cat("  Found", length(adapter_logs), "Trimmomatic pass1 logs\n")
+
+  for (log_file in adapter_logs) {
+    # Extract sample name from filename (e.g., "KM18-1-AMF_S486_trimmomatic_pass1.log.txt")
+    base_name <- sub("_trimmomatic_pass1\\.log\\.txt$", "", basename(log_file))
+    sample_name <- sub("_S\\d+$", "", base_name)  # Remove _S123 suffix
+    cat("  Parsing:", basename(log_file), "-> sample:", sample_name, "\n")
+    stats <- parse_trimmomatic_log(log_file)
+    adapter_stats[[sample_name]] <- stats
+    cat("    Extracted: input=", stats$input, " output=", stats$output, " pct_removed=", stats$pct_removed, "\n")
+  }
+} else {
+  # Illumina: use cutadapt JSON
+  cat("Platform is Illumina: looking for cutadapt JSON files\n")
+  if (dir.exists(adapter_log_dir)) {
+    all_files <- list.files(adapter_log_dir)
+    cat("  All files in directory:", paste(all_files, collapse=", "), "\n")
+  }
+
+  adapter_jsons <- list.files(adapter_log_dir, pattern = "^cutadapt\\..*\\.json$", full.names = TRUE)
+  cat("  Found", length(adapter_jsons), "adapter JSON files matching pattern\n")
+
+  # Also try alternative patterns
+  if (length(adapter_jsons) == 0) {
+    cat("  Trying alternative pattern *.json...\n")
+    adapter_jsons <- list.files(adapter_log_dir, pattern = "\\.json$", full.names = TRUE)
+    cat("  Found", length(adapter_jsons), "JSON files with *.json pattern\n")
+  }
+
+  for (json_file in adapter_jsons) {
+    # Extract sample name, removing cutadapt prefix and _S\d+ Illumina index suffix
+    base_name <- sub("^cutadapt\\.", "", sub("\\.json$", "", basename(json_file)))
+    sample_name <- sub("_S\\d+$", "", base_name)  # Remove _S123 suffix
+    cat("  Parsing:", basename(json_file), "-> sample:", sample_name, "(from: ", base_name, ")\n")
+    stats <- parse_cutadapt_json(json_file)
+    adapter_stats[[sample_name]] <- stats
+    cat("    Extracted: input=", stats$input, " output=", stats$output, " pct_removed=", stats$pct_removed, "\n")
+  }
 }
 
-# Parse primer JSONs
-primer_json_dir <- file.path(base_output_dir, "02_primer_trimmed", "02_logs")
+# Parse primer JSONs (cutadapt always for both platforms)
+# Aviti: 01b_primer_trimmed/02_logs/; Illumina: 02_primer_trimmed/02_logs/
+if (platform == "aviti") {
+  primer_json_dir <- file.path(base_output_dir, "01b_primer_trimmed", "02_logs")
+} else {
+  primer_json_dir <- file.path(base_output_dir, "02_primer_trimmed", "02_logs")
+}
+
 cat("Looking for primer JSONs in:", primer_json_dir, "\n")
 cat("  Directory exists:", dir.exists(primer_json_dir), "\n")
 

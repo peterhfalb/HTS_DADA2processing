@@ -153,6 +153,7 @@ rule dada2_qc:
     params:
         outdir    = OUTPUT_DIR + "/04_dada2_QCsummary",
         amplicon  = AMPLICON,
+        platform  = PLATFORM,
         dada2_dir = OUTPUT_DIR + "/03_dada2",
         primer_trimmed_dir = OUTPUT_DIR + "/02_primer_trimmed",
     log:
@@ -161,7 +162,7 @@ rule dada2_qc:
         """
         mkdir -p {params.outdir}/figures
         Rscript workflow/scripts/qc_figures.R \
-          {params.outdir} {params.amplicon} \
+          {params.outdir} {params.amplicon} {params.platform} \
           {input.dada2_summary} {params.dada2_dir} \
           {params.primer_trimmed_dir} \
           2>&1 | tee {log}
