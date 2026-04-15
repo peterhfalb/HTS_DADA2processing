@@ -145,6 +145,7 @@ rule cleanup_temp_files:
         rm -rf {OUTPUT_DIR}/02_primer_trimmed
         rm -rf {OUTPUT_DIR}/03_dada2/filtered
         echo "Temporary file cleanup complete"
+        touch {output.touch_file}
         """
 
 rule all:

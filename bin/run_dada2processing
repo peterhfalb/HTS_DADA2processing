@@ -484,6 +484,7 @@ else
         18S-V4)  echo "Taxonomy DB:      PR2 (default)" ;;
     esac
 fi
+echo ""
 echo "--PRIMERS--"
 # Resolve and display forward primer (may include auto-detected value)
 DISPLAY_FWD="${FWD_PRIMER_OVERRIDE:-$(
@@ -517,6 +518,7 @@ if [ "$SKIP_OTU" -eq 0 ]; then
     echo "mumu BLAST ID:    ${MUMU_BLAST_ID}%"
     echo "mumu ratio:       ${MUMU_RATIO}"
 fi
+echo ""
 echo "--FILES AND DIRECTORIES--"
 echo "Input directory:  $FASTQ_DIR"
 echo "Output directory: $OUTPUT_DIR"
