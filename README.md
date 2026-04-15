@@ -6,12 +6,6 @@ This pipeline script was written specifically for use by the Kennedy Lab at the 
 
 Adapter trimming, and DADA2 denoising settings were developed by Trevor Gould and adapted for use with this pipeline. Credit for the original development of the ASV to OTU pipeline goes to Eivind Ronold and Luis Morgado at the University of Oslo. I (PF) have updated and adapted all the scripts to work on University of Minnesota systems, as well as implemented various bug fixes and speed/code improvements. Individual scripts were consolidated into one pipeline script which compiles and installs all necessary packages for running the pipeline. The pipeline was also adapted to handle all types of sequencing data currently used in the Kennedy Lab (16S-V4, ITS1, ITS2, 18S-V4, 18S-AMF). 
 
-**Zazzy Metabarcoding Pipeline created by Luis Morgado, University of Oslo**
-
-**Updated by Eivind Kverme Ronold, University of Oslo, September 2024**
-
-**Updated by Peter Falb, University of Minnesota, April 2026**
-
 ## Installation instructions
 
 Login in to MSI via terminal on your mac (usage might be different on Windows, see https://msi.umn.edu/connecting/connecting-to-hpc-resources):
@@ -39,7 +33,7 @@ git clone https://github.com/peterhfalb/HTS_DADA2processing.git
 To set up and install the pipeline, open the cloned repository and run the setup/installation script:
 ```bash
 # move into the cloned repository
-cd HTS_ASV2OTU/ 
+cd HTS_DADA2processing/ 
 
 # run this line of code to install and compile the pipeline package
 bash install.sh
@@ -130,7 +124,7 @@ run_dada2processing --help
 
 To run the script, ssh login to the cluster and run `run_dada2processing` from anywhere — no need to navigate to the pipeline directory. You will have to specify at least 6 things:
 
-*Required*
+*Required:*
 1. Path to input fastq file folder (`--fastq-dir`)
 2. Path to output folder (`--output-dir`)
 3. Project Name, this will determine how your output files are named (`--project-name`)
@@ -138,7 +132,7 @@ To run the script, ssh login to the cluster and run `run_dada2processing` from a
 5. Sequencing platform (`--platform`)
 6. Email for SLURM submissions (`--email`)
 
-*Optional*
+*Optional:*
 1. Sequence quality (`--quality`)
         Right now, the default for sequence quality is `good`, by setting to `bad`, some of the filtering parameters in DADA2 become more stringent. Reach out to Trevor Gould or the UMGC for further information as to whether you sequencing run is *good* or *bad* quality.
 2. Taxonomy database - if using something other than default (`-taxonomy-database`)
@@ -155,6 +149,8 @@ To run the script, ssh login to the cluster and run `run_dada2processing` from a
         The MUMU algorithm requires a minimum similarity threshold for sequences to be merged as mother-daughter. This default is 94% for bacterial datasets, and 84% for all others. Increase the default value if you want MUMU merges to be more stringent/conservative.
 8. Manually specify MUMU minimum ratio (`--mumu-ratio`)
         The MUMU algorithm requires a minimum average ratio between parent-daughter abundances for them to be accepted as a merge. By default it is 100 for 16S and 1 for all other datasets. Increase the minimum ratio if you want MUMU merges to be more stringent/conservative.
+9. Keep only forward reads (`--fwd-reads-only`)
+        You can discard you reverse reads if merging is failing/discarding many of your reads due to lack of overlap or poor R2 quality. This will usually not be relevant but may be desired for 18S-V4 datasets.
 
 Expect a runtime of 10 - 120 minutes. It should not go much longer than that, but the SLURM script requests 12 hours of time on the cluster just in case.
 
