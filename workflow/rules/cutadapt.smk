@@ -1,34 +1,10 @@
 """
-Cutadapt rules: adapter and primer trimming
+Cutadapt rules: adapter and primer trimming (Illumina platform)
 """
 
 # ============================================================================
 # Step 1a: Adapter Trimming
 # ============================================================================
-
-def get_input_r1(wildcards):
-    """Find R1 file with or without _L001_ lane number"""
-    sample = wildcards.sample
-    with_lane = OUTPUT_DIR + f"/00_raw/{sample}_L001_R1_001.fastq.gz"
-    without_lane = OUTPUT_DIR + f"/00_raw/{sample}_R1_001.fastq.gz"
-    if os.path.exists(with_lane):
-        return with_lane
-    elif os.path.exists(without_lane):
-        return without_lane
-    else:
-        return with_lane  # Return default; let Snakemake error
-
-def get_input_r2(wildcards):
-    """Find R2 file with or without _L001_ lane number"""
-    sample = wildcards.sample
-    with_lane = OUTPUT_DIR + f"/00_raw/{sample}_L001_R2_001.fastq.gz"
-    without_lane = OUTPUT_DIR + f"/00_raw/{sample}_R2_001.fastq.gz"
-    if os.path.exists(with_lane):
-        return with_lane
-    elif os.path.exists(without_lane):
-        return without_lane
-    else:
-        return with_lane  # Return default; let Snakemake error
 
 rule trim_adapters:
     """Remove Illumina adapters from paired-end reads"""

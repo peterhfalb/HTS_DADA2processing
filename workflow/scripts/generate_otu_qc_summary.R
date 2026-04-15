@@ -22,7 +22,7 @@ cat("Run ITSx:   ", RUN_ITSX, "\n\n")
 # Collect counts from each step
 # ============================================================================
 
-otu_dir <- file.path(OUTPUT_DIR, "05_otu")
+otu_dir <- file.path(OUTPUT_DIR, "05_asv2otu")
 
 # 1. Input ASVs (from prepare_otu_input)
 centroid_input <- file.path(otu_dir, "01_input/Centroid.fasta")

@@ -13,13 +13,14 @@ Required arguments:
   --fastq-dir DIR           Directory containing raw demultiplexed fastq files
   --output-dir DIR          Output directory (will be created if needed)
   --email EMAIL             Email for SLURM notifications
+  --platform PLATFORM       Sequencing platform: illumina or aviti
+  --project-name NAME       Project name for output file naming
 
 Optional arguments:
   --quality QUALITY         Sequence quality level: good (default) or bad
   --taxonomy-database DB    Override taxonomy database: SILVA, UNITE, PR2, MaarjAM, EukaryomeSSU, EukaryomeITS
   --fwd-primer SEQUENCE     Override forward primer for this amplicon (DNA string)
   --rev-primer SEQUENCE     Override reverse primer for this amplicon (DNA string)
-  --project-name NAME       Project name for output file naming (default: basename of output-dir)
   --skip-otu                Skip OTU clustering pipeline (default: run OTU pipeline)
   --run-itsx                Run ITSx extraction (ITS1/ITS2 only; default: off)
   --otu-cluster-id ID       VSEARCH clustering identity (default: 0.97)
@@ -29,24 +30,25 @@ Optional arguments:
   --help                    Show this help message
 
 Examples:
-  run_dada2processing --amplicon 16S-V4 --fastq-dir /mnt/data/raw_fastqs --output-dir /mnt/output/16s_run --email me@umn.edu
-  run_dada2processing --amplicon ITS2 --fastq-dir ./fastqs --output-dir ./output --email me@umn.edu --quality bad --jobs 8
-  run_dada2processing --amplicon 16S-V4 --fastq-dir ./fastqs --output-dir ./output --email me@umn.edu --taxonomy-database UNITE --project-name MyProject
+  run_dada2processing --amplicon 16S-V4 --fastq-dir /mnt/data/raw_fastqs --output-dir /mnt/output/16s_run --email me@umn.edu --platform illumina --project-name MyProject
+  run_dada2processing --amplicon ITS2 --fastq-dir ./fastqs --output-dir ./output --email me@umn.edu --platform aviti --project-name ITS_Study --quality bad
+  run_dada2processing --amplicon 16S-V4 --fastq-dir ./fastqs --output-dir ./output --email me@umn.edu --platform illumina --project-name MyProject --taxonomy-database UNITE
 EOF
     exit 1
 }
 
 # Defaults
 QUALITY="good"
+PLATFORM=""
 JOBS=16
 AMPLICON=""
 FASTQ_DIR=""
 OUTPUT_DIR=""
 EMAIL=""
+PROJECT_NAME=""
 TAXONOMY_DB_OVERRIDE=""
 FWD_PRIMER_OVERRIDE=""
 REV_PRIMER_OVERRIDE=""
-PROJECT_NAME=""
 SKIP_OTU=0
 RUN_ITSX=0
 OTU_CLUSTER_ID="0.97"
@@ -74,6 +76,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --quality)
             QUALITY="$2"
+            shift 2
+            ;;
+        --platform)
+            PLATFORM="$2"
             shift 2
             ;;
         --jobs)
@@ -127,7 +133,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate required arguments
-if [[ -z "$AMPLICON" || -z "$FASTQ_DIR" || -z "$OUTPUT_DIR" || -z "$EMAIL" ]]; then
+if [[ -z "$AMPLICON" || -z "$FASTQ_DIR" || -z "$OUTPUT_DIR" || -z "$EMAIL" || -z "$PLATFORM" || -z "$PROJECT_NAME" ]]; then
     echo "Error: Missing required arguments"
     show_usage
 fi
@@ -151,6 +157,12 @@ fi
 # Validate quality
 if [[ "$QUALITY" != "good" && "$QUALITY" != "bad" ]]; then
     echo "Error: Quality must be 'good' or 'bad'"
+    exit 1
+fi
+
+# Validate platform
+if [[ "$PLATFORM" != "illumina" && "$PLATFORM" != "aviti" ]]; then
+    echo "Error: Platform must be 'illumina' or 'aviti'"
     exit 1
 fi
 
@@ -189,9 +201,6 @@ echo "Setting up directories and writing SLURM script..."
 # Create output directory structure
 mkdir -p "$OUTPUT_DIR"/{00_raw,logs}
 OUTPUT_DIR=$(cd "$OUTPUT_DIR" && pwd)
-
-# Set default project name to output directory basename
-PROJECT_NAME="${PROJECT_NAME:-$(basename "$OUTPUT_DIR")}"
 
 # Detect pipeline root directory
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
@@ -434,6 +443,7 @@ cat > "$CONFIG_FILE" << YAML
 
 amplicon: "$AMPLICON"
 quality: "$QUALITY"
+platform: "$PLATFORM"
 output_dir: "$OUTPUT_DIR"
 email: "$EMAIL"
 fastq_dir: "$FASTQ_DIR"
@@ -457,17 +467,12 @@ echo ""
 echo "=========================================="
 echo "DADA2 Pipeline Ready"
 echo "=========================================="
-echo "Amplicon:     $AMPLICON"
-echo "Quality:      $QUALITY"
-echo "Samples:      ${#SAMPLES[@]}"
-echo "Output:       $OUTPUT_DIR"
-echo "Config:       $CONFIG_FILE"
-echo "SLURM script: $SLURM_SCRIPT"
-echo "Log:          $LOG_FILE"
-echo ""
-echo "Input directory:  $FASTQ_DIR"
+echo "--SETTINGS AND SPECIFICATIONS--"
+echo "Amplicon:         $AMPLICON"
+echo "Quality:          $QUALITY"
+echo "Platform:         $PLATFORM"
+echo "Samples:          ${#SAMPLES[@]}"
 echo "Project name:     $PROJECT_NAME"
-
 # Display taxonomy database
 if [[ -n "$TAXONOMY_DB_OVERRIDE" ]]; then
     echo "Taxonomy DB:      $TAXONOMY_DB_OVERRIDE (override)"
@@ -479,7 +484,7 @@ else
         18S-V4)  echo "Taxonomy DB:      PR2 (default)" ;;
     esac
 fi
-
+echo "--PRIMERS--"
 # Resolve and display forward primer (may include auto-detected value)
 DISPLAY_FWD="${FWD_PRIMER_OVERRIDE:-$(
   case "$AMPLICON" in
@@ -504,17 +509,25 @@ DISPLAY_REV="${REV_PRIMER_OVERRIDE:-$(
 echo "Fwd primer:       $DISPLAY_FWD"
 echo "Rev primer:       $DISPLAY_REV"
 echo ""
-echo "OTU clustering:   $([ "$SKIP_OTU" -eq 1 ] && echo 'disabled' || echo "enabled (${OTU_CLUSTER_ID} identity)")"
+
 if [ "$SKIP_OTU" -eq 0 ]; then
+    echo "--ASV2OTU SETTINGS--"
+    echo "OTU clustering:   ${OTU_CLUSTER_ID} identity"
     echo "ITSx extraction:  $([ "$RUN_ITSX" -eq 1 ] && echo 'enabled' || echo 'disabled')"
     echo "mumu BLAST ID:    ${MUMU_BLAST_ID}%"
     echo "mumu ratio:       ${MUMU_RATIO}"
 fi
+echo "--FILES AND DIRECTORIES--"
+echo "Input directory:  $FASTQ_DIR"
+echo "Output directory: $OUTPUT_DIR"
+echo "Config file:      $CONFIG_FILE"
+echo "SLURM script:     $SLURM_SCRIPT"
+echo "Log file:         $LOG_FILE"
+echo ""
 
 echo ""
-echo "Submit job with:"
+echo ""
+echo "Run this command to submit the job to the supercomputer:"
 echo "  sbatch $SLURM_SCRIPT"
 echo ""
-echo "Or dry-run with (only necessary for debugging purposes):"
-echo "  snakemake -n --snakefile $PIPELINE_DIR/Snakefile --configfile $CONFIG_FILE"
 echo "=========================================="

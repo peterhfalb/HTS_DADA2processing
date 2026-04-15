@@ -2,6 +2,45 @@
 DADA2 rule: denoising, merging, chimera removal, taxonomy assignment
 """
 
+# ============================================================================
+# Helper functions for platform-specific inputs
+# ============================================================================
+
+def get_adapter_logs(wildcards):
+    """Return adapter trimming logs based on platform"""
+    if PLATFORM == "aviti":
+        # Aviti uses Trimmomatic logs
+        return expand(OUTPUT_DIR + "/01_adapter/01_logs/{sample}_trimmomatic_pass1.log.txt", sample=SAMPLES)
+    else:
+        # Illumina uses cutadapt logs
+        return expand(OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.log.txt", sample=SAMPLES)
+
+def get_adapter_jsons(wildcards):
+    """Return adapter trimming JSON logs (Illumina only)"""
+    if PLATFORM == "aviti":
+        # Aviti doesn't have JSON logs, return empty list (handled by rule)
+        return []
+    else:
+        return expand(OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.json", sample=SAMPLES)
+
+def get_primer_logs(wildcards):
+    """Return primer trimming logs based on platform"""
+    if PLATFORM == "aviti":
+        # For Aviti, primer logs are from cutadapt (middle step)
+        return expand(OUTPUT_DIR + "/01b_primer_trimmed/02_logs/cutadapt.{sample}.log.txt", sample=SAMPLES)
+    else:
+        # For Illumina, primer logs from final trimming
+        return expand(OUTPUT_DIR + "/02_primer_trimmed/02_logs/cutadapt.{sample}.log.txt", sample=SAMPLES)
+
+def get_primer_jsons(wildcards):
+    """Return primer trimming JSON logs based on platform"""
+    if PLATFORM == "aviti":
+        # For Aviti, primer JSONs from cutadapt (middle step)
+        return expand(OUTPUT_DIR + "/01b_primer_trimmed/02_logs/cutadapt.{sample}.json", sample=SAMPLES)
+    else:
+        # For Illumina, primer JSONs from final trimming
+        return expand(OUTPUT_DIR + "/02_primer_trimmed/02_logs/cutadapt.{sample}.json", sample=SAMPLES)
+
 rule dada2:
     """DADA2 denoising and taxonomy assignment"""
     input:
@@ -27,6 +66,7 @@ rule dada2:
         taxonomy_db=EFFECTIVE_TAXONOMY_DB,
         project_name=PROJECT_NAME,
         db_name=DB_NAME,
+        platform=PLATFORM,
     log:
         OUTPUT_DIR + "/.logs/dada2.log",
     threads: workflow.cores
@@ -41,6 +81,7 @@ rule dada2:
           {threads} \
           {params.project_name} \
           {params.db_name} \
+          {params.platform} \
           2>&1 | tee {log}
         """
 
@@ -102,15 +143,15 @@ rule dada2_qc:
         errF          = OUTPUT_DIR + "/03_dada2/errF.rds",
         errR          = OUTPUT_DIR + "/03_dada2/errR.rds",
         seqtab_nochim = OUTPUT_DIR + "/03_dada2/seqtab_nochim.rds",
-        adapter_jsons = expand(OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.json", sample=SAMPLES),
-        primer_jsons  = expand(OUTPUT_DIR + "/02_primer_trimmed/02_logs/cutadapt.{sample}.json", sample=SAMPLES),
-        adapter_logs  = expand(OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.log.txt", sample=SAMPLES),
-        primer_logs   = expand(OUTPUT_DIR + "/02_primer_trimmed/02_logs/cutadapt.{sample}.log.txt", sample=SAMPLES),
+        adapter_jsons = get_adapter_jsons,
+        primer_jsons  = get_primer_jsons,
+        adapter_logs  = get_adapter_logs,
+        primer_logs   = get_primer_logs,
         primer_fqs    = expand(OUTPUT_DIR + "/02_primer_trimmed/{sample}_R1_001.fastq.gz", sample=SAMPLES),
     output:
-        qc_summary = OUTPUT_DIR + "/04_QC/qc_summary.txt",
+        qc_summary = OUTPUT_DIR + "/04_dada2_QCsummary/qc_summary.txt",
     params:
-        outdir    = OUTPUT_DIR + "/04_QC",
+        outdir    = OUTPUT_DIR + "/04_dada2_QCsummary",
         amplicon  = AMPLICON,
         dada2_dir = OUTPUT_DIR + "/03_dada2",
         primer_trimmed_dir = OUTPUT_DIR + "/02_primer_trimmed",

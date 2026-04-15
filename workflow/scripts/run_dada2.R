@@ -1,13 +1,13 @@
 #!/usr/bin/env Rscript
 # DADA2 denoising and taxonomy assignment
-# Usage: Rscript run_dada2.R <output_dir> <amplicon> <quality> <taxonomy_db> <threads> <project_name> <db_name>
+# Usage: Rscript run_dada2.R <output_dir> <amplicon> <quality> <taxonomy_db> <threads> <project_name> <db_name> <platform>
 
 library(dada2)
 
 # Parse command-line arguments
 args <- commandArgs(trailingOnly = TRUE)
-if (length(args) < 7) {
-  stop("Usage: Rscript run_dada2.R <output_dir> <amplicon> <quality> <taxonomy_db> <threads> <project_name> <db_name>")
+if (length(args) < 8) {
+  stop("Usage: Rscript run_dada2.R <output_dir> <amplicon> <quality> <taxonomy_db> <threads> <project_name> <db_name> <platform>")
 }
 
 output_dir <- args[1]
@@ -17,12 +17,14 @@ taxonomy_db <- args[4]
 threads <- as.numeric(args[5])
 project_name <- args[6]
 db_name <- args[7]
+platform <- tolower(args[8])
 
 cat("DADA2 Pipeline\n")
 cat("==============\n")
 cat("Output dir:    ", output_dir, "\n")
 cat("Amplicon type: ", amplicon, "\n")
 cat("Quality:       ", quality, "\n")
+cat("Platform:      ", platform, "\n")
 cat("Taxonomy DB:   ", taxonomy_db, "\n")
 cat("Project name:  ", project_name, "\n")
 cat("DB name:       ", db_name, "\n")
@@ -67,30 +69,60 @@ cat("FILTERING\n")
 cat("=========\n")
 
 if (amplicon == "16S-V4") {
-  if (quality == "good") {
-    out <- filterAndTrim(
-      fnFs, filtFs, fnRs, filtRs,
-      truncLen = c(240, 200),
-      maxN = 0,
-      maxEE = c(2, 4),
-      minLen = 100,
-      truncQ = 2,
-      rm.phix = TRUE,
-      compress = TRUE,
-      multithread = threads
-    )
-  } else if (quality == "bad") {
-    out <- filterAndTrim(
-      fnFs, filtFs, fnRs, filtRs,
-      truncLen = c(240, 200),
-      maxN = 0,
-      maxEE = c(4, 6),
-      minLen = 100,
-      truncQ = 2,
-      rm.phix = TRUE,
-      compress = TRUE,
-      multithread = threads
-    )
+  if (platform == "aviti") {
+    # Aviti platform-specific settings for 16S-V4
+    if (quality == "good") {
+      out <- filterAndTrim(
+        fnFs, filtFs, fnRs, filtRs,
+        truncLen = c(240, 220),
+        maxN = 0,
+        maxEE = c(2, 2),
+        minLen = 100,
+        truncQ = 2,
+        rm.phix = TRUE,
+        compress = TRUE,
+        multithread = threads
+      )
+    } else if (quality == "bad") {
+      out <- filterAndTrim(
+        fnFs, filtFs, fnRs, filtRs,
+        truncLen = c(260, 260),
+        maxN = 0,
+        maxEE = c(4, 6),
+        minLen = 100,
+        truncQ = 2,
+        rm.phix = TRUE,
+        compress = TRUE,
+        multithread = threads
+      )
+    }
+  } else {
+    # Illumina (default) platform settings for 16S-V4
+    if (quality == "good") {
+      out <- filterAndTrim(
+        fnFs, filtFs, fnRs, filtRs,
+        truncLen = c(240, 200),
+        maxN = 0,
+        maxEE = c(2, 4),
+        minLen = 100,
+        truncQ = 2,
+        rm.phix = TRUE,
+        compress = TRUE,
+        multithread = threads
+      )
+    } else if (quality == "bad") {
+      out <- filterAndTrim(
+        fnFs, filtFs, fnRs, filtRs,
+        truncLen = c(240, 200),
+        maxN = 0,
+        maxEE = c(4, 6),
+        minLen = 100,
+        truncQ = 2,
+        rm.phix = TRUE,
+        compress = TRUE,
+        multithread = threads
+      )
+    }
   }
 } else if (amplicon == "ITS1" || amplicon == "ITS2") {
   if (quality == "good") {
@@ -219,7 +251,33 @@ saveRDS(seqtab, file.path(output_dir, "seqtab.rds"))
 cat("\nCHIMERA REMOVAL\n")
 cat("===============\n")
 
-seqtab.nochim <- removeBimeraDenovo(seqtab, method = "consensus", multithread = TRUE, verbose = TRUE)
+if (platform == "aviti") {
+  # Aviti-specific chimera removal: per-sample method with higher abundance threshold
+  # This addresses Aviti's overabundance of high-quality error-induced reads
+  # See: Gould et al. preprint on Aviti processing best practices
+  cat("Using Aviti chimera detection settings:\n")
+  cat("  Method: per-sample\n")
+  cat("  minFoldParentOverAbundance: 8 (vs default 2)\n\n")
+  seqtab.nochim <- removeBimeraDenovo(
+    seqtab,
+    method = "per-sample",
+    minFoldParentOverAbundance = 8,
+    multithread = TRUE,
+    verbose = TRUE
+  )
+} else {
+  # Illumina (default) chimera removal: consensus method with default abundance threshold
+  cat("Using Illumina chimera detection settings:\n")
+  cat("  Method: consensus\n")
+  cat("  minFoldParentOverAbundance: 2 (default)\n\n")
+  seqtab.nochim <- removeBimeraDenovo(
+    seqtab,
+    method = "consensus",
+    multithread = TRUE,
+    verbose = TRUE
+  )
+}
+
 cat("Dimensions after chimera removal:", dim(seqtab.nochim), "\n")
 saveRDS(seqtab.nochim, file.path(output_dir, "seqtab_nochim.rds"))
 

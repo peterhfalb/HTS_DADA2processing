@@ -15,11 +15,12 @@ configfile: "config.yaml"
 
 AMPLICON = config["amplicon"]
 QUALITY = config["quality"]
+PLATFORM = config["platform"]
 OUTPUT_DIR = config["output_dir"]
 SAMPLES = config["samples"]
 EMAIL = config["email"]
 FASTQ_DIR = config["fastq_dir"]
-PROJECT_NAME = config.get("project_name", os.path.basename(OUTPUT_DIR))
+PROJECT_NAME = config["project_name"]
 TAXONOMY_DB_OVERRIDE = config.get("taxonomy_db_override", "")
 FWD_PRIMER_OVERRIDE = config.get("fwd_primer_override", "")
 REV_PRIMER_OVERRIDE = config.get("rev_primer_override", "")
@@ -92,21 +93,70 @@ EFFECTIVE_FWD = FWD_PRIMER_OVERRIDE if FWD_PRIMER_OVERRIDE else PRIMERS[AMPLICON
 EFFECTIVE_REV = REV_PRIMER_OVERRIDE if REV_PRIMER_OVERRIDE else PRIMERS[AMPLICON]["rev"]
 
 # ============================================================================
+# Helper Functions
+# ============================================================================
+
+def get_input_r1(wildcards):
+    """Find R1 file with or without _L001_ lane number"""
+    sample = wildcards.sample
+    with_lane = OUTPUT_DIR + f"/00_raw/{sample}_L001_R1_001.fastq.gz"
+    without_lane = OUTPUT_DIR + f"/00_raw/{sample}_R1_001.fastq.gz"
+    if os.path.exists(with_lane):
+        return with_lane
+    elif os.path.exists(without_lane):
+        return without_lane
+    else:
+        return with_lane  # Return default; let Snakemake error
+
+def get_input_r2(wildcards):
+    """Find R2 file with or without _L001_ lane number"""
+    sample = wildcards.sample
+    with_lane = OUTPUT_DIR + f"/00_raw/{sample}_L001_R2_001.fastq.gz"
+    without_lane = OUTPUT_DIR + f"/00_raw/{sample}_R2_001.fastq.gz"
+    if os.path.exists(with_lane):
+        return with_lane
+    elif os.path.exists(without_lane):
+        return without_lane
+    else:
+        return with_lane  # Return default; let Snakemake error
+
+# ============================================================================
 # Rules
 # ============================================================================
 
-rule all:
-    """Final target: DADA2 + OTU processing complete"""
+rule cleanup_temp_files:
+    """Remove temporary FASTQ files created during processing"""
     input:
         # ASV outputs (always)
         OUTPUT_DIR + f"/03_dada2/{PROJECT_NAME}__combined_sequences_ASVtaxa_{DB_NAME}.txt",
         OUTPUT_DIR + f"/03_dada2/{PROJECT_NAME}__combined_sequences_ASVtaxa_bootstrap_{DB_NAME}.txt",
         OUTPUT_DIR + "/03_dada2/README.txt",
-        OUTPUT_DIR + "/04_QC/qc_summary.txt",
+        OUTPUT_DIR + "/04_dada2_QCsummary/qc_summary.txt",
         # Main directory summary files (always)
         OUTPUT_DIR + "/qc_summary.txt",
         OUTPUT_DIR + "/README.txt"
+    output:
+        touch_file=OUTPUT_DIR + "/.cleanup.done"
+    shell:
+        """
+        echo "Cleaning up temporary files..."
+        rm -rf {OUTPUT_DIR}/01_adapter
+        rm -rf {OUTPUT_DIR}/01b_primer_trimmed
+        rm -rf {OUTPUT_DIR}/02_primer_trimmed
+        rm -rf {OUTPUT_DIR}/03_dada2/filtered
+        echo "Temporary file cleanup complete"
+        """
 
-include: "workflow/rules/cutadapt.smk"
+rule all:
+    """Final target: DADA2 + OTU processing complete"""
+    input:
+        OUTPUT_DIR + "/.cleanup.done"
+
+# Include trimming rules based on platform
+if PLATFORM == "aviti":
+    include: "workflow/rules/aviti_trimming.smk"
+else:
+    include: "workflow/rules/cutadapt.smk"
+
 include: "workflow/rules/dada2.smk"
 include: "workflow/rules/asv2otu.smk"

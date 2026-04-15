@@ -47,7 +47,7 @@ if (file.exists(asv_source)) {
 # ============================================================================
 # 2. Copy OTU table to main directory (if it exists)
 # ============================================================================
-otu_source <- paste0("05_otu/", PROJECT, "__OTUs_with_taxonomy_", DB_NAME, ".txt")
+otu_source <- paste0("05_asv2otu/", PROJECT, "__OTUs_with_taxonomy_", DB_NAME, ".txt")
 otu_dest <- paste0(PROJECT, "__OTUs_with_taxonomy_", DB_NAME, ".txt")
 
 otu_exists <- FALSE
@@ -67,7 +67,7 @@ if (!SKIP_OTU && file.exists(otu_source)) {
 cat("\nProcessing QC table...\n")
 
 # Read per-sample QC table from DADA2/cutadapt step
-qc_per_sample_path <- "04_QC/qc_summary.txt"
+qc_per_sample_path <- "04_dada2_QCsummary/qc_summary.txt"
 if (file.exists(qc_per_sample_path)) {
   qc_per_sample <- read_tsv(qc_per_sample_path, show_col_types = FALSE)
   cat("✓ Loaded per-sample QC table (", nrow(qc_per_sample), " rows)\n")
@@ -80,7 +80,7 @@ if (file.exists(qc_per_sample_path)) {
 qc_final <- qc_per_sample
 
 # Append OTU QC summary if OTU was run
-otu_qc_path <- "05_otu/otu_qc_summary.txt"
+otu_qc_path <- "05_asv2otu/otu_qc_summary.txt"
 if (!SKIP_OTU && file.exists(otu_qc_path)) {
   cat("✓ Found OTU QC summary\n")
 
@@ -189,12 +189,12 @@ if (!SKIP_OTU) {
 readme_content <- paste0(readme_content,
   "## Additional Output Directories\n\n",
   "- `03_dada2/`: Full DADA2 denoising pipeline outputs (error models, sequence tables, taxonomy RDS files)\n",
-  "- `04_QC/`: Quality control figures and statistics (quality profiles, error models, read tracking)\n"
+  "- `04_dada2_QCsummary/`: Quality control figures and statistics (quality profiles, error models, read tracking)\n"
 )
 
 if (!SKIP_OTU) {
   readme_content <- paste0(readme_content,
-    "- `05_otu/`: OTU clustering workflow details (VSEARCH centroids, mumu curation logs, intermediate tables)\n"
+    "- `05_asv2otu/`: OTU clustering workflow details (VSEARCH centroids, mumu curation logs, intermediate tables)\n"
   )
 }
 
