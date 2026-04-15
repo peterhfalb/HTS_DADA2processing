@@ -1,13 +1,13 @@
 #!/usr/bin/env Rscript
 # DADA2 denoising and taxonomy assignment
-# Usage: Rscript run_dada2.R <output_dir> <amplicon> <quality> <taxonomy_db> <threads> <project_name> <db_name> <platform>
+# Usage: Rscript run_dada2.R <output_dir> <amplicon> <quality> <taxonomy_db> <threads> <project_name> <db_name> <platform> <fwd_reads_only>
 
 library(dada2)
 
 # Parse command-line arguments
 args <- commandArgs(trailingOnly = TRUE)
-if (length(args) < 8) {
-  stop("Usage: Rscript run_dada2.R <output_dir> <amplicon> <quality> <taxonomy_db> <threads> <project_name> <db_name> <platform>")
+if (length(args) < 9) {
+  stop("Usage: Rscript run_dada2.R <output_dir> <amplicon> <quality> <taxonomy_db> <threads> <project_name> <db_name> <platform> <fwd_reads_only>")
 }
 
 output_dir <- args[1]
@@ -18,6 +18,7 @@ threads <- as.numeric(args[5])
 project_name <- args[6]
 db_name <- args[7]
 platform <- tolower(args[8])
+fwd_reads_only <- as.logical(as.integer(args[9]))
 
 cat("DADA2 Pipeline\n")
 cat("==============\n")
@@ -192,8 +193,6 @@ cat("=============\n")
 
 derep_forward <- derepFastq(filtFs, verbose = TRUE)
 names(derep_forward) <- sample.names
-derep_reverse <- derepFastq(filtRs, verbose = TRUE)
-names(derep_reverse) <- sample.names
 
 # ==============================================================================
 # ERROR LEARNING & DENOISING
@@ -202,40 +201,57 @@ cat("ERROR LEARNING\n")
 cat("==============\n")
 
 errF <- learnErrors(derep_forward, multithread = threads, randomize = TRUE)
-errR <- learnErrors(derep_reverse, multithread = threads, randomize = TRUE)
 
 # Save error models for QC figures
 saveRDS(errF, file.path(output_dir, "errF.rds"))
-saveRDS(errR, file.path(output_dir, "errR.rds"))
 
 cat("DADA2 INFERENCE\n")
 cat("===============\n")
 
 dadaFs <- dada(derep_forward, err = errF, multithread = threads, pool = "pseudo")
-dadaRs <- dada(derep_reverse, err = errR, multithread = threads, pool = "pseudo")
+
+# Process reverse reads only if not in forward-only mode
+if (!fwd_reads_only) {
+  derep_reverse <- derepFastq(filtRs, verbose = TRUE)
+  names(derep_reverse) <- sample.names
+
+  errR <- learnErrors(derep_reverse, multithread = threads, randomize = TRUE)
+  saveRDS(errR, file.path(output_dir, "errR.rds"))
+
+  dadaRs <- dada(derep_reverse, err = errR, multithread = threads, pool = "pseudo")
+}
 
 # ==============================================================================
 # MERGING - parameters depend on amplicon type
 # ==============================================================================
-cat("MERGING PAIRED READS\n")
-cat("====================\n")
+if (!fwd_reads_only) {
+  cat("MERGING PAIRED READS\n")
+  cat("====================\n")
 
-if (amplicon == "16S-V4") {
-  merged_amplicons <- mergePairs(dadaFs, derep_forward, dadaRs, derep_reverse,
-    trimOverhang = TRUE, minOverlap = 20
-  )
-} else if (amplicon == "ITS1" || amplicon == "ITS2") {
-  merged_amplicons <- mergePairs(dadaFs, derep_forward, dadaRs, derep_reverse,
-    trimOverhang = TRUE, minOverlap = 10
-  )
-} else if (amplicon == "18S-AMF") {
-  merged_amplicons <- mergePairs(dadaFs, derep_forward, dadaRs, derep_reverse,
-    trimOverhang = TRUE, minOverlap = 10
-  )
-} else if (amplicon == "18S-V4") {
-  merged_amplicons <- mergePairs(dadaFs, derep_forward, dadaRs, derep_reverse,
-    trimOverhang = TRUE, minOverlap = 10
-  )
+  if (amplicon == "16S-V4") {
+    merged_amplicons <- mergePairs(dadaFs, derep_forward, dadaRs, derep_reverse,
+      trimOverhang = TRUE, minOverlap = 20
+    )
+  } else if (amplicon == "ITS1" || amplicon == "ITS2") {
+    merged_amplicons <- mergePairs(dadaFs, derep_forward, dadaRs, derep_reverse,
+      trimOverhang = TRUE, minOverlap = 10
+    )
+  } else if (amplicon == "18S-AMF") {
+    merged_amplicons <- mergePairs(dadaFs, derep_forward, dadaRs, derep_reverse,
+      trimOverhang = TRUE, minOverlap = 10
+    )
+  } else if (amplicon == "18S-V4") {
+    merged_amplicons <- mergePairs(dadaFs, derep_forward, dadaRs, derep_reverse,
+      trimOverhang = TRUE, minOverlap = 10
+    )
+  }
+} else {
+  # Forward-only mode: skip merging, use forward reads directly
+  cat("FORWARD-ONLY MODE\n")
+  cat("=================\n")
+  errR <- NULL
+  saveRDS(errR, file.path(output_dir, "errR.rds"))
+  cat("Reverse reads skipped. Sequence table will be built from forward reads only.\n")
 }
 
 # ==============================================================================
@@ -244,7 +260,12 @@ if (amplicon == "16S-V4") {
 cat("SEQUENCE TABLE CONSTRUCTION\n")
 cat("===========================\n")
 
-seqtab <- makeSequenceTable(merged_amplicons)
+if (fwd_reads_only) {
+  seqtab <- makeSequenceTable(dadaFs)
+  cat("Built from forward reads only.\n")
+} else {
+  seqtab <- makeSequenceTable(merged_amplicons)
+}
 cat("Dimensions:", dim(seqtab), "\n")
 saveRDS(seqtab, file.path(output_dir, "seqtab.rds"))
 
@@ -300,8 +321,8 @@ summary_tab <- data.frame(
   dada2_input = out[, 1],
   filtered = out[, 2],
   dada_f = sapply(dadaFs, getN),
-  dada_r = sapply(dadaRs, getN),
-  merged = sapply(merged_amplicons, getN),
+  dada_r = if (fwd_reads_only) NA else sapply(dadaRs, getN),
+  merged = if (fwd_reads_only) NA else sapply(merged_amplicons, getN),
   nonchim = rowSums(seqtab.nochim)
 )
 

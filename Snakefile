@@ -25,6 +25,9 @@ TAXONOMY_DB_OVERRIDE = config.get("taxonomy_db_override", "")
 FWD_PRIMER_OVERRIDE = config.get("fwd_primer_override", "")
 REV_PRIMER_OVERRIDE = config.get("rev_primer_override", "")
 
+# DADA2 processing configuration
+FWD_READS_ONLY  = config.get("fwd_reads_only", "0") == "1"
+
 # OTU pipeline configuration
 SKIP_OTU        = config.get("skip_otu", "0") == "1"
 RUN_ITSX        = config.get("run_itsx", "0") == "1"

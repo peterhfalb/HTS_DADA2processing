@@ -605,7 +605,7 @@ EOF
 rule finalize_outputs:
     """Copy summary files to main directory and generate final README"""
     input:
-        asv_table=OUTPUT_DIR + f"/03_dada2/{PROJECT_NAME}__combined_sequences_ASVtaxa_{DB_NAME}.txt",
+        asv_table=OUTPUT_DIR + f"/03_dada2/{PROJECT_NAME}__combined_sequences_ASVtaxa_bootstrap_{DB_NAME}.txt",
         qc_per_sample=OUTPUT_DIR + "/04_dada2_QCsummary/qc_summary.txt",
         # ASV2OTU README files (conditional on SKIP_OTU)
         **{f"readme_input": OUTPUT_DIR + "/05_asv2otu/01_input/README.txt"} if not SKIP_OTU else {},

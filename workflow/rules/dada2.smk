@@ -67,6 +67,7 @@ rule dada2:
         project_name=PROJECT_NAME,
         db_name=DB_NAME,
         platform=PLATFORM,
+        fwd_reads_only=int(FWD_READS_ONLY),
     log:
         OUTPUT_DIR + "/.logs/dada2.log",
     threads: workflow.cores
@@ -82,6 +83,7 @@ rule dada2:
           {params.project_name} \
           {params.db_name} \
           {params.platform} \
+          {params.fwd_reads_only} \
           2>&1 | tee {log}
         """
 

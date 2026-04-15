@@ -21,6 +21,7 @@ Optional arguments:
   --taxonomy-database DB    Override taxonomy database: SILVA, UNITE, PR2, MaarjAM, EukaryomeSSU, EukaryomeITS
   --fwd-primer SEQUENCE     Override forward primer for this amplicon (DNA string)
   --rev-primer SEQUENCE     Override reverse primer for this amplicon (DNA string)
+  --fwd-reads-only          Use forward reads only; skip reverse read processing (default: off)
   --skip-otu                Skip OTU clustering pipeline (default: run OTU pipeline)
   --run-itsx                Run ITSx extraction (ITS1/ITS2 only; default: off)
   --otu-cluster-id ID       VSEARCH clustering identity (default: 0.97)
@@ -49,6 +50,7 @@ PROJECT_NAME=""
 TAXONOMY_DB_OVERRIDE=""
 FWD_PRIMER_OVERRIDE=""
 REV_PRIMER_OVERRIDE=""
+FWD_READS_ONLY=0
 SKIP_OTU=0
 RUN_ITSX=0
 OTU_CLUSTER_ID="0.97"
@@ -101,6 +103,10 @@ while [[ $# -gt 0 ]]; do
         --project-name)
             PROJECT_NAME="$2"
             shift 2
+            ;;
+        --fwd-reads-only)
+            FWD_READS_ONLY=1
+            shift 1
             ;;
         --skip-otu)
             SKIP_OTU=1
@@ -451,6 +457,7 @@ project_name: "$PROJECT_NAME"
 taxonomy_db_override: "$TAXONOMY_DB_OVERRIDE"
 fwd_primer_override: "$FWD_PRIMER_OVERRIDE"
 rev_primer_override: "$REV_PRIMER_OVERRIDE"
+fwd_reads_only: "$FWD_READS_ONLY"
 skip_otu: "$SKIP_OTU"
 run_itsx: "$RUN_ITSX"
 otu_cluster_id: "$OTU_CLUSTER_ID"
@@ -509,6 +516,7 @@ DISPLAY_REV="${REV_PRIMER_OVERRIDE:-$(
 
 echo "Fwd primer:       $DISPLAY_FWD"
 echo "Rev primer:       $DISPLAY_REV"
+echo "Forward-only:     $([ "$FWD_READS_ONLY" -eq 1 ] && echo 'yes' || echo 'no')"
 echo ""
 
 if [ "$SKIP_OTU" -eq 0 ]; then

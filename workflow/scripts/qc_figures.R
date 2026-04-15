@@ -492,14 +492,19 @@ tryCatch({
       cat("  ✗ error_model_fwd.pdf:", e$message, "\n")
     })
 
-    tryCatch({
-      cat("    Plotting reverse error model...\n")
-      p <- plotErrors(errR, nominalQ = TRUE)
-      ggsave(file.path(qc_outdir, "figures", "error_model_rev.pdf"), plot = p, width = 12, height = 7)
-      cat("  ✓ error_model_rev.pdf\n")
-    }, error = function(e) {
-      cat("  ✗ error_model_rev.pdf:", e$message, "\n")
-    })
+    # Only plot reverse error model if errR is not NULL (i.e., not in forward-only mode)
+    if (!is.null(errR)) {
+      tryCatch({
+        cat("    Plotting reverse error model...\n")
+        p <- plotErrors(errR, nominalQ = TRUE)
+        ggsave(file.path(qc_outdir, "figures", "error_model_rev.pdf"), plot = p, width = 12, height = 7)
+        cat("  ✓ error_model_rev.pdf\n")
+      }, error = function(e) {
+        cat("  ✗ error_model_rev.pdf:", e$message, "\n")
+      })
+    } else {
+      cat("    Reverse error model skipped (forward-only mode)\n")
+    }
   }
 }, error = function(e) {
   cat("  Error loading error models:", e$message, "\n")
