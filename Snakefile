@@ -74,8 +74,8 @@ TAXONOMY_DB_PATHS = {
     "UNITE": "/projects/standard/kennedyp/shared/taxonomy/sh_general_release_dynamic_all_19.02.2025_wKennedySynmock.fasta",
     "PR2": "/projects/standard/kennedyp/shared/taxonomy/pr2_version_5.1.1_SSU_dada2.fasta",
     "MaarjAM": "/projects/standard/kennedyp/shared/taxonomy/maarjam_dada2_SSU_2021.fasta",
-    "EukaryomeSSU": "/projects/standard/kennedyp/shared/taxonomy/DADA2_EUK_SSU_v.2.0.fasta",
-    "EukaryomeITS": "/projects/standard/kennedyp/shared/taxonomy/DADA2_EUK_ITS_v.2.0_wKennedySynmock.fasta",
+    "EukaryomeSSU": "/projects/standard/kennedyp/shared/taxonomy/DADA2_EUK_SSU_v2.0.fasta",
+    "EukaryomeITS": "/projects/standard/kennedyp/shared/taxonomy/DADA2_EUK_ITS_v2.0_wKennedySynmock.fasta",
 }
 
 # Default DB name per amplicon (for output filename when no override)
