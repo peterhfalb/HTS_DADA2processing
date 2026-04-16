@@ -449,21 +449,17 @@ print(f\"{d.get('fwd_name', '')} {d.get('fwd_seq', '')} {d.get('fwd_pct', 0)} {d
 fi
 
 # ==============================================================================
-# ADAPTER AUTO-DETECTION
+# ADAPTER SELECTION
 # ==============================================================================
 echo ""
 echo "=========================================="
-echo "AUTO-DETECTING ADAPTERS"
+echo "USING DEFAULT NEXTERA XT ADAPTERS"
 echo "=========================================="
 echo ""
-
-python3 "$SCRIPT_DIR/detect_adapters.py" "$FASTQ_DIR" 3 "$OUTPUT_DIR" || {
-  echo ""
-  echo "WARNING: Adapter auto-detection had issues"
-  echo "Will use default Nextera XT adapters"
-  echo ""
-}
-
+echo "Note: Using comprehensive default adapter set including:"
+echo "  - Nextera transposase sequences (read-through protection)"
+echo "  - i7 and i5 Illumina index adapters"
+echo "  (Cutadapt 5.0 does not support automatic adapter detection)"
 echo ""
 
 # Now write config.yaml AFTER primer and adapter detection (CONFIG_FILE defined earlier)

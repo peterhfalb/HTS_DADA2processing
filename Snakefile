@@ -78,12 +78,15 @@ EFFECTIVE_FWD = FWD_PRIMER_OVERRIDE if FWD_PRIMER_OVERRIDE else PRIMERS[AMPLICON
 EFFECTIVE_REV = REV_PRIMER_OVERRIDE if REV_PRIMER_OVERRIDE else PRIMERS[AMPLICON]["rev"]
 
 # Load detected adapters from adapter auto-detection
+# Note: includes transposase sequences for read-through contamination on short amplicons (16S-V4, ITS)
 DETECTED_ADAPTERS = {
     "adapters": [
-        "ATCTCGTATGCCGTCTTCTGCTTG",      # i7 Nextera XT (default)
-        "CAAGCAGAAGACGGCATACGAGAT",      # i7 reverse complement (default)
-        "GTGTAGATCTCGGTGGTCGCCGTATCATT", # i5 Nextera XT (default)
-        "AATGATACGGCGACCACCGAGATCTACAC", # i5 reverse complement (default)
+        "CTGTCTCTTATACACATCT",           # Nextera transposase (read-through R1, Illumina)
+        "AGATGTGTATAAGAGACAG",           # Nextera transposase RC (read-through R2, Illumina)
+        "ATCTCGTATGCCGTCTTCTGCTTG",      # i7 Nextera XT index adapter
+        "CAAGCAGAAGACGGCATACGAGAT",      # i7 index adapter RC
+        "GTGTAGATCTCGGTGGTCGCCGTATCATT", # i5 Nextera XT index adapter
+        "AATGATACGGCGACCACCGAGATCTACAC", # i5 index adapter RC
     ]
 }
 
