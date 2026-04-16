@@ -9,8 +9,8 @@ DADA2 rule: denoising, merging, chimera removal, taxonomy assignment
 def get_adapter_logs(wildcards):
     """Return adapter trimming logs based on platform"""
     if PLATFORM == "aviti":
-        # Aviti uses Trimmomatic logs
-        return expand(OUTPUT_DIR + "/01_adapter/01_logs/{sample}_trimmomatic_pass1.log.txt", sample=SAMPLES)
+        # Aviti uses Trimmomatic stderr logs (contain summary statistics)
+        return expand(OUTPUT_DIR + "/.logs/aviti_trimmomatic_pass1_{sample}.log", sample=SAMPLES)
     else:
         # Illumina uses cutadapt logs
         return expand(OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.log.txt", sample=SAMPLES)
@@ -26,8 +26,8 @@ def get_adapter_jsons(wildcards):
 def get_primer_logs(wildcards):
     """Return primer trimming logs based on platform"""
     if PLATFORM == "aviti":
-        # For Aviti, primer logs are from cutadapt (middle step)
-        return expand(OUTPUT_DIR + "/01b_primer_trimmed/02_logs/cutadapt.{sample}.log.txt", sample=SAMPLES)
+        # For Aviti, primer logs are from cutadapt (middle step), stored in .logs/
+        return expand(OUTPUT_DIR + "/.logs/aviti_cutadapt_primers_{sample}.log", sample=SAMPLES)
     else:
         # For Illumina, primer logs from final trimming
         return expand(OUTPUT_DIR + "/02_primer_trimmed/02_logs/cutadapt.{sample}.log.txt", sample=SAMPLES)

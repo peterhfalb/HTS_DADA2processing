@@ -140,25 +140,31 @@ parse_cutadapt_json <- function(json_path) {
 base_output_dir <- dirname(primer_trimmed_dir)
 cat("Base output directory:", base_output_dir, "\n")
 
-adapter_log_dir <- file.path(base_output_dir, "01_adapter", "01_logs")
+adapter_log_dir <- if (platform == "aviti") {
+  file.path(base_output_dir, ".logs")
+} else {
+  file.path(base_output_dir, "01_adapter", "01_logs")
+}
+
 cat("Looking for adapter logs in:", adapter_log_dir, "\n")
 cat("  Directory exists:", dir.exists(adapter_log_dir), "\n")
 
 adapter_stats <- list()
 
 if (platform == "aviti") {
-  cat("Platform is Aviti: looking for Trimmomatic logs\n")
+  cat("Platform is Aviti: looking for Trimmomatic stderr logs in .logs/\n")
   if (dir.exists(adapter_log_dir)) {
     all_files <- list.files(adapter_log_dir)
     cat("  All files in directory:", paste(all_files, collapse=", "), "\n")
   }
 
-  adapter_logs <- list.files(adapter_log_dir, pattern = "_trimmomatic_pass1\\.log\\.txt$", full.names = TRUE)
-  cat("  Found", length(adapter_logs), "Trimmomatic pass1 logs\n")
+  adapter_logs <- list.files(adapter_log_dir, pattern = "^aviti_trimmomatic_pass1_.*\\.log$", full.names = TRUE)
+  cat("  Found", length(adapter_logs), "Trimmomatic pass1 stderr logs\n")
 
   for (log_file in adapter_logs) {
-    # Extract sample name from filename (e.g., "KM18-1-AMF_S486_trimmomatic_pass1.log.txt")
-    base_name <- sub("_trimmomatic_pass1\\.log\\.txt$", "", basename(log_file))
+    # Extract sample name from filename (e.g., "aviti_trimmomatic_pass1_KM18-1-AMF_S486.log")
+    base_name <- sub("^aviti_trimmomatic_pass1_", "", basename(log_file))
+    base_name <- sub("\\.log$", "", base_name)
     sample_name <- sub("_S\\d+$", "", base_name)  # Remove _S123 suffix
     cat("  Parsing:", basename(log_file), "-> sample:", sample_name, "\n")
     stats <- parse_trimmomatic_log(log_file)
@@ -195,10 +201,15 @@ if (platform == "aviti") {
 }
 
 # Parse primer JSONs (cutadapt always for both platforms)
-# Aviti: 01b_primer_trimmed/02_logs/; Illumina: 02_primer_trimmed/02_logs/
+# For both platforms, JSON files are stored in their respective trimmed directories during execution
+# but we reference them from .logs/ where the stderr logs are located
 if (platform == "aviti") {
+  # Aviti primer trimming is done with cutadapt after Trimmomatic adapter pass 1
+  # JSON files go to 01b_primer_trimmed/02_logs/ (not deleted before qc runs)
   primer_json_dir <- file.path(base_output_dir, "01b_primer_trimmed", "02_logs")
 } else {
+  # Illumina primer trimming is done with cutadapt
+  # JSON files go to 02_primer_trimmed/02_logs/
   primer_json_dir <- file.path(base_output_dir, "02_primer_trimmed", "02_logs")
 }
 
@@ -260,6 +271,10 @@ cat("Combining QC statistics...\n")
 
 # Build combined QC table
 sample_names <- rownames(dada2_summary)
+cat("Sample names from DADA2 summary:", paste(sample_names, collapse = ", "), "\n")
+cat("Adapter stats keys:", paste(names(adapter_stats), collapse = ", "), "\n")
+cat("Primer stats keys:", paste(names(primer_stats), collapse = ", "), "\n")
+
 qc_df <- data.frame(row.names = sample_names)
 
 # Add reads_start (from adapter stats if available, else from primer stats)
