@@ -74,7 +74,8 @@ if RUN_ITSX and AMPLICON in ("ITS1", "ITS2"):
                 if (size > 0) print
             }}' {params.outdir}/Centroid.ITSx.{params.region}.fixed.fasta > {params.outdir}/Centroid.ITSx.{params.region}.filtered.fasta
 
-            rm -f {params.outdir}/Centroid.ITSx.* {params.outdir}/Centroid.ITSx.{params.region}.fixed.fasta
+            # Clean up intermediate files (keep only the final filtered output)
+            rm -f {params.outdir}/Centroid.ITSx.{params.region}.fasta {params.outdir}/Centroid.ITSx.{params.region}.fixed.fasta
             """
 
 # ============================================================================
