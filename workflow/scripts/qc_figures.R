@@ -164,8 +164,7 @@ if (platform == "aviti") {
   for (log_file in adapter_logs) {
     # Extract sample name from filename (e.g., "aviti_trimmomatic_pass1_KM18-1-AMF_S486.log")
     base_name <- sub("^aviti_trimmomatic_pass1_", "", basename(log_file))
-    base_name <- sub("\\.log$", "", base_name)
-    sample_name <- sub("_S\\d+$", "", base_name)  # Remove _S123 suffix
+    sample_name <- sub("\\.log$", "", base_name)  # Keep _S## suffix to match DADA2 sample names
     cat("  Parsing:", basename(log_file), "-> sample:", sample_name, "\n")
     stats <- parse_trimmomatic_log(log_file)
     adapter_stats[[sample_name]] <- stats
@@ -190,10 +189,10 @@ if (platform == "aviti") {
   }
 
   for (json_file in adapter_jsons) {
-    # Extract sample name, removing cutadapt prefix and _S\d+ Illumina index suffix
+    # Extract sample name, removing cutadapt prefix only (keep _S## suffix to match DADA2 sample names)
     base_name <- sub("^cutadapt\\.", "", sub("\\.json$", "", basename(json_file)))
-    sample_name <- sub("_S\\d+$", "", base_name)  # Remove _S123 suffix
-    cat("  Parsing:", basename(json_file), "-> sample:", sample_name, "(from: ", base_name, ")\n")
+    sample_name <- base_name  # Keep full name with _S## suffix
+    cat("  Parsing:", basename(json_file), "-> sample:", sample_name, "\n")
     stats <- parse_cutadapt_json(json_file)
     adapter_stats[[sample_name]] <- stats
     cat("    Extracted: input=", stats$input, " output=", stats$output, " pct_removed=", stats$pct_removed, "\n")
@@ -228,10 +227,10 @@ if (length(primer_jsons) == 0) {
 
 primer_stats <- list()
 for (json_file in primer_jsons) {
-  # Extract sample name, removing cutadapt prefix and _S\d+ Illumina index suffix
+  # Extract sample name, removing cutadapt prefix only (keep _S## suffix to match DADA2 sample names)
   base_name <- sub("^cutadapt\\.", "", sub("\\.json$", "", basename(json_file)))
-  sample_name <- sub("_S\\d+$", "", base_name)  # Remove _S123 suffix
-  cat("  Parsing:", basename(json_file), "-> sample:", sample_name, "(from: ", base_name, ")\n")
+  sample_name <- base_name  # Keep full name with _S## suffix
+  cat("  Parsing:", basename(json_file), "-> sample:", sample_name, "\n")
   stats <- parse_cutadapt_json(json_file)
   primer_stats[[sample_name]] <- stats
   cat("    Extracted: input=", stats$input, " output=", stats$output, " pct_removed=", stats$pct_removed, "\n")
@@ -271,10 +270,6 @@ cat("Combining QC statistics...\n")
 
 # Build combined QC table
 sample_names <- rownames(dada2_summary)
-cat("Sample names from DADA2 summary:", paste(sample_names, collapse = ", "), "\n")
-cat("Adapter stats keys:", paste(names(adapter_stats), collapse = ", "), "\n")
-cat("Primer stats keys:", paste(names(primer_stats), collapse = ", "), "\n")
-
 qc_df <- data.frame(row.names = sample_names)
 
 # Add reads_start (from adapter stats if available, else from primer stats)
