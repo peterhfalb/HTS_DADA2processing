@@ -37,35 +37,30 @@ dir.create(file.path(qc_outdir, "figures"), showWarnings = FALSE, recursive = TR
 parse_trimmomatic_log <- function(log_path) {
   tryCatch({
     lines <- readLines(log_path)
-    # Trimmomatic log format: "TrimmomaticPE: Processed 1000000 paired reads in 50.23 seconds (19882.15 reads/sec)"
-    # Extract pairs processed and various outcomes
+    # Trimmomatic stderr format contains:
+    # "Input Read Pairs: 205977 Both Surviving: 205878 (99.95%) Forward Only Surviving: 0 (0.00%) Reverse Only Surviving: 91 (0.04%) Dropped: 8 (0.00%)"
 
-    # Look for the main summary line
-    summary_line <- grep("TrimmomaticPE:", lines, value = TRUE)
+    # Look for line with "Input Read Pairs:"
+    input_line <- grep("Input Read Pairs:", lines, value = TRUE)
 
-    if (length(summary_line) == 0) {
+    if (length(input_line) == 0) {
       return(list(input = NA, output = NA, pct_removed = NA, pct_r1 = NA, pct_r2 = NA))
     }
 
-    summary_line <- summary_line[length(summary_line)]  # Use last match if multiple
+    input_line <- input_line[length(input_line)]  # Use last match if multiple
 
-    # Extract input reads: "Processed X paired reads"
-    input_match <- regexpr("Processed\\s+([0-9]+)\\s+paired", summary_line)
+    # Extract input reads: "Input Read Pairs: X"
     input_reads <- NA
+    input_match <- regexpr("Input Read Pairs:\\s+([0-9]+)", input_line)
     if (input_match > 0) {
-      input_reads <- as.numeric(sub("^.*Processed\\s+([0-9]+).*", "\\1", summary_line))
+      input_reads <- as.numeric(sub("^.*Input Read Pairs:\\s+([0-9]+).*", "\\1", input_line))
     }
 
-    # Parse the per-read statistics to get survival count
-    # Lines with format: "   Both surviving: 1000 (100.00%)"
-    both_surviving <- grep("Both surviving", lines, value = TRUE)
+    # Extract output reads: "Both Surviving: X"
     output_reads <- NA
-    if (length(both_surviving) > 0) {
-      both_line <- both_surviving[length(both_surviving)]
-      output_match <- regexpr("([0-9]+)\\s+\\(", both_line)
-      if (output_match > 0) {
-        output_reads <- as.numeric(sub("^.*\\s+([0-9]+)\\s+\\(.*", "\\1", both_line))
-      }
+    output_match <- regexpr("Both Surviving:\\s+([0-9]+)", input_line)
+    if (output_match > 0) {
+      output_reads <- as.numeric(sub("^.*Both Surviving:\\s+([0-9]+).*", "\\1", input_line))
     }
 
     list(
