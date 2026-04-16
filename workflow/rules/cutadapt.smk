@@ -16,27 +16,21 @@ rule trim_adapters:
         r2=OUTPUT_DIR + "/01_adapter/{sample}_R2_001.fastq.gz",
         log=OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.log.txt",
         json=OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.json",
+    params:
+        adapter_flags=" ".join(f"-a {a} -A {a}" for a in DETECTED_ADAPTERS["adapters"]),
     log:
         OUTPUT_DIR + "/.logs/cutadapt_adapter_{sample}.log",
     threads: 8
-    run:
-        # Build adapter flags from detected adapters
-        adapter_flags = ""
-        adapters = DETECTED_ADAPTERS["adapters"]
-        # Apply each detected adapter to both R1 (-a/-g) and R2 (-A/-G)
-        # Assuming 3' end adapters, add to both -a and -A flags
-        for adapter in adapters:
-            adapter_flags += f" -a {adapter} -A {adapter}"
-
-        shell(f"""
+    shell:
+        """
         mkdir -p $(dirname {output.log})
-        cutadapt --cores {threads} --pair-filter=any --minimum-length 150 {adapter_flags} \
+        cutadapt --cores {threads} --pair-filter=any --minimum-length 150 {params.adapter_flags} \
           --json={output.json} \
           -o {output.r1} \
           -p {output.r2} \
           {input.r1} {input.r2} \
           > {output.log} 2>&1
-        """)
+        """
 
 rule summarize_adapter_logs:
     """Aggregate adapter trimming log statistics"""

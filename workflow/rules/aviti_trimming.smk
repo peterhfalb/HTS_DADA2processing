@@ -111,16 +111,16 @@ rule aviti_trim_adapters_pass2:
 rule aviti_summarize_trimming:
     """Aggregate Trimmomatic and cutadapt trimming statistics"""
     input:
-        trimmo1_logs=expand(
-            OUTPUT_DIR + "/01_adapter/01_logs/{sample}_trimmomatic_pass1.log.txt",
+        trimmo1_stderr=expand(
+            OUTPUT_DIR + "/.logs/aviti_trimmomatic_pass1_{sample}.log",
             sample=SAMPLES,
         ),
         cutadapt_logs=expand(
             OUTPUT_DIR + "/01b_primer_trimmed/02_logs/cutadapt.{sample}.log.txt",
             sample=SAMPLES,
         ),
-        trimmo2_logs=expand(
-            OUTPUT_DIR + "/02_primer_trimmed/02_logs/{sample}_trimmomatic_pass2.log.txt",
+        trimmo2_stderr=expand(
+            OUTPUT_DIR + "/.logs/aviti_trimmomatic_pass2_{sample}.log",
             sample=SAMPLES,
         ),
     output:
@@ -131,15 +131,21 @@ rule aviti_summarize_trimming:
         readme_final=OUTPUT_DIR + "/02_primer_trimmed/README.txt",
     shell:
         """
-        # Summarize Trimmomatic pass 1
+        # Summarize Trimmomatic pass 1 (grep stderr logs for summary stats)
         echo "# Trimmomatic Pass 1 (Adapter Removal)" > {output.summary_pass1}
         echo "Sample\tInput Pairs\tBoth Surviving\tForward Only\tReverse Only\tDropped" >> {output.summary_pass1}
-        grep "TrimmomaticPE" {input.trimmo1_logs} >> {output.summary_pass1} 2>/dev/null || true
+        for log in {input.trimmo1_stderr}; do
+            sample=$(basename "$log" .log | sed 's/aviti_trimmomatic_pass1_//')
+            grep "Input Read Pairs:" "$log" | head -1 | sed "s/^/$sample\t/" >> {output.summary_pass1}
+        done 2>/dev/null || true
 
-        # Summarize Trimmomatic pass 2
+        # Summarize Trimmomatic pass 2 (grep stderr logs for summary stats)
         echo "# Trimmomatic Pass 2 (Final Adapter Removal)" > {output.summary_pass2}
         echo "Sample\tInput Pairs\tBoth Surviving\tForward Only\tReverse Only\tDropped" >> {output.summary_pass2}
-        grep "TrimmomaticPE" {input.trimmo2_logs} >> {output.summary_pass2} 2>/dev/null || true
+        for log in {input.trimmo2_stderr}; do
+            sample=$(basename "$log" .log | sed 's/aviti_trimmomatic_pass2_//')
+            grep "Input Read Pairs:" "$log" | head -1 | sed "s/^/$sample\t/" >> {output.summary_pass2}
+        done 2>/dev/null || true
 
         # Write README for 01_adapter
         cat > {output.readme_adapter} << 'EOF'

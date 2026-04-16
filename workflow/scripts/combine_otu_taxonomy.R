@@ -61,8 +61,8 @@ print(map)
 otu_id_col  <- names(otu)[1]
 sample_cols <- names(otu)[-1]
 
-# Check if renaming is needed (columns look like S001, S002...)
-needs_rename <- all(grepl("^S\\d{3}$", sample_cols))
+# Check if renaming is needed (columns look like S001, S002, ..., S10000+)
+needs_rename <- all(grepl("^S\\d+$", sample_cols))
 
 if (needs_rename) {
   rename_map <- setNames(map$Sample_name, map$BioInf_Sample)

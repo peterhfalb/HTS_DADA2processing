@@ -45,12 +45,15 @@ fnFs <- sort(list.files(filtered_dir, pattern = "_R1_001.fastq.gz", full.names =
 fnRs <- sort(list.files(filtered_dir, pattern = "_R2_001.fastq.gz", full.names = TRUE))
 cat("Found ", length(fnFs), " forward and ", length(fnRs), " reverse reads\n")
 
-if (length(fnFs) == 0 || length(fnRs) == 0) {
-  stop("No fastq files found")
+if (length(fnFs) == 0) {
+  stop("No R1 fastq files found")
+}
+if (!fwd_reads_only && length(fnRs) == 0) {
+  stop("No R2 fastq files found")
 }
 
-# Extract sample names (ProjectName_SampleName format)
-sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1)
+# Extract sample names (strip R1_001 suffix but preserve sample name underscores)
+sample.names <- sub("_R1_001\\.fastq\\.gz$", "", basename(fnFs))
 cat("Samples: ", paste(sample.names, collapse = ", "), "\n\n")
 
 # Ensure output directory exists
@@ -113,17 +116,17 @@ get_filter_params <- function(amplicon, quality, platform) {
 
 # Get parameters and execute filterAndTrim with minimal code duplication
 filter_params <- get_filter_params(amplicon, quality, platform)
-out <- do.call(filterAndTrim, c(
-  list(fnFs, filtFs, fnRs, filtRs),
-  filter_params
-))
+if (fwd_reads_only) {
+  # Forward-only: filter R1 only
+  out <- do.call(filterAndTrim, c(list(fnFs, filtFs), filter_params))
+} else {
+  # Paired-end: filter R1 and R2
+  out <- do.call(filterAndTrim, c(list(fnFs, filtFs, fnRs, filtRs), filter_params))
+}
 
-# ==============================================================================
-# LEGACY CODE REMOVED - Replaced with helper function above
-# ==============================================================================
-if (FALSE) {  # Disabled - functionality moved to get_filter_params()
-if (amplicon == "16S-V4") {
-  if (platform == "aviti") {
+# Legacy platform-specific filter parameters moved to get_filter_params() helper
+
+# HEAD OF FILTERED TABLE:
     # Aviti platform-specific settings for 16S-V4
     if (quality == "good") {
       out <- filterAndTrim(
@@ -407,7 +410,7 @@ use_tryRC <- amplicon %in% c("18S-AMF", "18S-V4")
 use_minBoot <- 50
 
 taxa <- assignTaxonomy(seqtab.nochim, taxonomy_db,
-  multithread = TRUE,
+  multithread = threads,
   outputBootstraps = TRUE,
   taxLevels = tax_levels,
   tryRC = use_tryRC,

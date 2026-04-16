@@ -25,12 +25,12 @@ TAXONOMY_DB_OVERRIDE = config.get("taxonomy_db_override", "")
 FWD_PRIMER_OVERRIDE = config.get("fwd_primer_override", "")
 REV_PRIMER_OVERRIDE = config.get("rev_primer_override", "")
 
-# DADA2 processing configuration
-FWD_READS_ONLY  = config.get("fwd_reads_only", "0") == "1"
+# DADA2 processing configuration (handle both string and int YAML inputs)
+FWD_READS_ONLY  = str(config.get("fwd_reads_only", "0")) == "1"
 
-# OTU pipeline configuration
-SKIP_OTU        = config.get("skip_otu", "0") == "1"
-RUN_ITSX        = config.get("run_itsx", "0") == "1"
+# OTU pipeline configuration (handle both string and int YAML inputs)
+SKIP_OTU        = str(config.get("skip_otu", "0")) == "1"
+RUN_ITSX        = str(config.get("run_itsx", "0")) == "1"
 OTU_CLUSTER_ID  = config.get("otu_cluster_id", "0.97")
 MUMU_BLAST_ID   = config.get("mumu_blast_id", "84")
 MUMU_RATIO      = config.get("mumu_ratio", "1")
@@ -40,15 +40,6 @@ import json
 primers_config_path = os.path.join(workflow.basedir, "workflow/config/primers.json")
 with open(primers_config_path) as f:
     PRIMERS = json.load(f)
-
-# Taxonomy database paths on MSI Agate
-TAXONOMY_DB = {
-    "16S-V4": "/projects/standard/kennedyp/shared/taxonomy/silva_nr99_v138.1_train_set.fa",
-    "ITS1": "/projects/standard/kennedyp/shared/taxonomy/sh_general_release_dynamic_all_19.02.2025_wKennedySynmock.fasta",
-    "ITS2": "/projects/standard/kennedyp/shared/taxonomy/sh_general_release_dynamic_all_19.02.2025_wKennedySynmock.fasta",
-    "18S-AMF": "/projects/standard/kennedyp/shared/taxonomy/maarjam_dada2_SSU_2021.fasta",
-    "18S-V4": "/projects/standard/kennedyp/shared/taxonomy/pr2_version_5.1.1_SSU_dada2.fasta",
-}
 
 # Named taxonomy database paths (for --taxonomy-database option)
 TAXONOMY_DB_PATHS = {
@@ -70,8 +61,17 @@ TAXONOMY_DB_DEFAULT_NAMES = {
 }
 
 # Resolve effective taxonomy database path and short name
-EFFECTIVE_TAXONOMY_DB = TAXONOMY_DB_PATHS[TAXONOMY_DB_OVERRIDE] if TAXONOMY_DB_OVERRIDE else TAXONOMY_DB[AMPLICON]
-DB_NAME = TAXONOMY_DB_OVERRIDE if TAXONOMY_DB_OVERRIDE else TAXONOMY_DB_DEFAULT_NAMES[AMPLICON]
+if TAXONOMY_DB_OVERRIDE:
+    if TAXONOMY_DB_OVERRIDE not in TAXONOMY_DB_PATHS:
+        raise KeyError(f"taxonomy_db_override '{TAXONOMY_DB_OVERRIDE}' not in TAXONOMY_DB_PATHS. Valid keys: {list(TAXONOMY_DB_PATHS.keys())}")
+    EFFECTIVE_TAXONOMY_DB = TAXONOMY_DB_PATHS[TAXONOMY_DB_OVERRIDE]
+    DB_NAME = TAXONOMY_DB_OVERRIDE
+else:
+    if AMPLICON not in TAXONOMY_DB_DEFAULT_NAMES:
+        raise KeyError(f"amplicon '{AMPLICON}' not in TAXONOMY_DB_DEFAULT_NAMES. Valid amplicons: {list(TAXONOMY_DB_DEFAULT_NAMES.keys())}")
+    db_name_key = TAXONOMY_DB_DEFAULT_NAMES[AMPLICON]
+    EFFECTIVE_TAXONOMY_DB = TAXONOMY_DB_PATHS[db_name_key]
+    DB_NAME = db_name_key
 
 # Resolve effective primers
 EFFECTIVE_FWD = FWD_PRIMER_OVERRIDE if FWD_PRIMER_OVERRIDE else PRIMERS[AMPLICON]["fwd"]

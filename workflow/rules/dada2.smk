@@ -72,13 +72,14 @@ rule dada2:
         db_name=DB_NAME,
         platform=PLATFORM,
         fwd_reads_only=int(FWD_READS_ONLY),
+        pipeline_dir=workflow.basedir,
     log:
         OUTPUT_DIR + "/.logs/dada2.log",
     threads: workflow.cores
     shell:
         """
         mkdir -p {params.outdir}
-        Rscript workflow/scripts/run_dada2.R \
+        Rscript {params.pipeline_dir}/workflow/scripts/run_dada2.R \
           {params.outdir} \
           {params.amplicon} \
           {params.quality} \

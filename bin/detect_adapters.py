@@ -34,10 +34,15 @@ def find_fastq_files(fastq_dir, num_samples=3):
     if not r1_files or not r2_files:
         return []
 
-    # Return first N pairs (limit to available)
+    # Match R1 and R2 files by sample name stem (not by sorted index)
+    r1_stems = {os.path.basename(f).replace("_R1_001.fastq.gz", ""): f for f in r1_files}
+    r2_stems = {os.path.basename(f).replace("_R2_001.fastq.gz", ""): f for f in r2_files}
+    matched_stems = sorted(set(r1_stems) & set(r2_stems))
+
+    # Return first N matched pairs
     pairs = []
-    for i in range(min(num_samples, len(r1_files))):
-        pairs.append((r1_files[i], r2_files[i]))
+    for stem in matched_stems[:num_samples]:
+        pairs.append((r1_stems[stem], r2_stems[stem]))
 
     return pairs
 
@@ -55,7 +60,7 @@ def run_detect_adapters(r1_file, r2_file, read_limit=100000):
         cmd = [
             "cutadapt",
             "--detect-adapters",
-            f"--reads={read_limit}",
+            "--max-reads", str(read_limit),
             "--json", json_output,
             "-o", "/dev/null",
             "-p", "/dev/null",
@@ -82,10 +87,10 @@ def run_detect_adapters(r1_file, r2_file, read_limit=100000):
             print(f"ERROR: Failed to parse cutadapt JSON: {e}", file=sys.stderr)
             return None
 
-        # Extract detected adapters from either read1_adapters or read2_adapters
+        # Extract detected adapters (cutadapt JSON uses adapters_read1/adapters_read2)
         result_data = {
-            "r1_adapters": data.get("read1_adapters", []),
-            "r2_adapters": data.get("read2_adapters", []),
+            "r1_adapters": data.get("adapters_read1", []),
+            "r2_adapters": data.get("adapters_read2", []),
         }
 
         return result_data

@@ -359,23 +359,13 @@ set -u  # Re-enable strict mode
 # Load primers from external JSON config (single source of truth)
 PRIMERS_JSON="$PIPELINE_DIR/workflow/config/primers.json"
 
-# Determine which primers to validate using JSON (single read of JSON file)
-read VALIDATE_FWD VALIDATE_REV < <(python3 << 'PYEOF'
-import json, sys
-try:
-    with open('$PRIMERS_JSON') as f:
-        primers = json.load(f)
-        if '$AMPLICON' in primers:
-            fwd = primers['$AMPLICON']['fwd']
-            rev = primers['$AMPLICON']['rev']
-            print(f"{fwd} {rev}")
-        else:
-            sys.exit(1)
-except Exception as e:
-    print(f'ERROR: Could not load primers: {e}', file=sys.stderr)
-    sys.exit(1)
-PYEOF
-)
+# Determine which primers to validate using external script
+read VALIDATE_FWD VALIDATE_REV < <(python3 "$SCRIPT_DIR/get_primers.py" \
+    --primers-json "$PRIMERS_JSON" \
+    --amplicon "$AMPLICON") || {
+  echo "ERROR: Failed to extract primers from $PRIMERS_JSON"
+  exit 1
+}
 
 VALIDATE_FWD="${FWD_PRIMER_OVERRIDE:-$VALIDATE_FWD}"
 VALIDATE_REV="${REV_PRIMER_OVERRIDE:-$VALIDATE_REV}"
@@ -384,15 +374,17 @@ echo ""
 echo "Scanning fastq files for expected primers..."
 echo ""
 
-# Run primer check using cutadapt
-python3 "$SCRIPT_DIR/check_primers_cutadapt.py" "$FASTQ_DIR" "$VALIDATE_FWD" "$VALIDATE_REV" "$AMPLICON" "$OUTPUT_DIR" || {
-  echo ""
-  echo "ERROR: Primer validation failed"
-  echo "Please check that:"
-  echo "  1. Python and cutadapt are available (module load cutadapt)"
-  echo "  2. FASTQ files exist in $FASTQ_DIR"
-  exit 1
-}
+# Run primer check using cutadapt (skip for forward-only mode; R2 files may not exist)
+if [[ "$FWD_READS_ONLY" -eq 0 ]]; then
+  python3 "$SCRIPT_DIR/check_primers_cutadapt.py" "$FASTQ_DIR" "$VALIDATE_FWD" "$VALIDATE_REV" "$AMPLICON" "$OUTPUT_DIR" || {
+    echo ""
+    echo "ERROR: Primer validation failed"
+    echo "Please check that:"
+    echo "  1. Python and cutadapt are available (module load cutadapt)"
+    echo "  2. FASTQ files exist in $FASTQ_DIR"
+    exit 1
+  }
+fi
 
 # Read detected primers from JSON file (saved in output_dir to avoid permission issues)
 PRIMER_JSON="$OUTPUT_DIR/.primer_detection.json"
@@ -409,12 +401,12 @@ if [[ -f "$PRIMER_JSON" ]]; then
     EXPECTED_REV_SEQ=$(jq -r '.expected_rev' "$PRIMER_JSON")
   else
     # Fallback to python (single read of JSON file)
-    read DETECTED_FWD_NAME DETECTED_FWD_SEQ DETECTED_FWD_PCT DETECTED_REV_NAME DETECTED_REV_SEQ DETECTED_REV_PCT EXPECTED_FWD_SEQ EXPECTED_REV_SEQ < <(python3 << 'PYEOF'
+    read DETECTED_FWD_NAME DETECTED_FWD_SEQ DETECTED_FWD_PCT DETECTED_REV_NAME DETECTED_REV_SEQ DETECTED_REV_PCT EXPECTED_FWD_SEQ EXPECTED_REV_SEQ < <(python3 -c "
 import json
-d = json.load(open('$PRIMER_JSON'))
-print(f"{d.get('fwd_name', '')} {d.get('fwd_seq', '')} {d.get('fwd_pct', 0)} {d.get('rev_name', '')} {d.get('rev_seq', '')} {d.get('rev_pct', 0)} {d.get('expected_fwd', '')} {d.get('expected_rev', '')}")
-PYEOF
-)
+with open('$PRIMER_JSON') as f:
+    d = json.load(f)
+print(f\"{d.get('fwd_name', '')} {d.get('fwd_seq', '')} {d.get('fwd_pct', 0)} {d.get('rev_name', '')} {d.get('rev_seq', '')} {d.get('rev_pct', 0)} {d.get('expected_fwd', '')} {d.get('expected_rev', '')}\")
+")
   fi
 
   # Check if detected primers differ from expected and use detected ones if >80% match

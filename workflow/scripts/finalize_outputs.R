@@ -69,7 +69,7 @@ cat("\nProcessing QC table...\n")
 # Read per-sample QC table from DADA2/cutadapt step
 qc_per_sample_path <- "04_dada2_QCsummary/qc_summary.txt"
 if (file.exists(qc_per_sample_path)) {
-  qc_per_sample <- read_tsv(qc_per_sample_path, show_col_types = FALSE)
+  qc_per_sample <- read_tsv(qc_per_sample_path, comment = "#", show_col_types = FALSE)
   cat("✓ Loaded per-sample QC table (", nrow(qc_per_sample), " rows)\n")
 } else {
   warning("Per-sample QC table not found: ", qc_per_sample_path)
@@ -95,8 +95,8 @@ if (!SKIP_OTU && file.exists(otu_qc_path)) {
   header_row[[1]] <- "# ASV to OTU QC Summary"
   qc_final <- bind_rows(qc_final, header_row)
 
-  # Read OTU QC summary (Metric\tValue format)
-  otu_qc <- read_tsv(otu_qc_path, skip = 2, show_col_types = FALSE)  # skip comment lines
+  # Read OTU QC summary (Metric\tValue format, skip 2 comments + 1 blank line)
+  otu_qc <- read_tsv(otu_qc_path, skip = 3, show_col_types = FALSE)
 
   # Add each OTU metric as a data row
   for (i in seq_len(nrow(otu_qc))) {

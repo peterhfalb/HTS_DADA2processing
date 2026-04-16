@@ -49,7 +49,7 @@ PRIMER_REV = {
     "806r": "GGACTACNVGGGTWTCTAAT",
     "1492R": "RGYTACCTTGTTACGACTT",
     "R22": "GCCTGCTGCCTTCCTTGGA",
-    "1132r": "CCGTCAATTHCTTTYAART",
+    "1132r": "CCGTCAATTHCTTYAART",
 }
 # Add base primers with amplicon names as keys
 for amplicon, primers in base_primers.items():

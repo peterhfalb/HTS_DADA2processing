@@ -11,8 +11,8 @@ library(dada2)
 library(Biostrings)
 
 args <- commandArgs(trailingOnly = TRUE)
-if (length(args) < 3) {
-  stop("Usage: Rscript 05_assign_taxonomy_rdp.R <fasta_path> <db_path> <output_path> <threads>")
+if (length(args) < 4) {
+  stop("Usage: Rscript assign_otu_taxonomy.R <fasta_path> <db_path> <output_path> <primer_set> [<db_name>]")
 }
 
 FASTA_PATH   <- args[1]

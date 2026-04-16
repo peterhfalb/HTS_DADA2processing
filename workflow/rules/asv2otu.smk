@@ -68,6 +68,7 @@ if RUN_ITSX and AMPLICON in ("ITS1", "ITS2"):
                     size = 1  # Default to keep if no size annotation
                 }}
                 print_seq = (size > 0)
+                if (print_seq) print
             }} !/^>/ {{
                 if (print_seq) print
             }}' {params.outdir}/Centroid.ITSx.{params.region}.fasta > {params.outdir}/Centroid.ITSx.{params.region}.filtered.fasta
