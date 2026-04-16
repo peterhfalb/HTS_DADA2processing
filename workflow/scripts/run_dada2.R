@@ -82,7 +82,7 @@ if (amplicon == "16S-V4") {
         truncQ = 2,
         rm.phix = TRUE,
         compress = TRUE,
-        multithread = threads
+        multithread = min(threads, 4)
       )
     } else if (quality == "bad") {
       out <- filterAndTrim(
@@ -94,7 +94,7 @@ if (amplicon == "16S-V4") {
         truncQ = 2,
         rm.phix = TRUE,
         compress = TRUE,
-        multithread = threads
+        multithread = min(threads, 4)
       )
     }
   } else {
@@ -109,7 +109,7 @@ if (amplicon == "16S-V4") {
         truncQ = 2,
         rm.phix = TRUE,
         compress = TRUE,
-        multithread = threads
+        multithread = min(threads, 4)
       )
     } else if (quality == "bad") {
       out <- filterAndTrim(
@@ -121,7 +121,7 @@ if (amplicon == "16S-V4") {
         truncQ = 2,
         rm.phix = TRUE,
         compress = TRUE,
-        multithread = threads
+        multithread = min(threads, 4)
       )
     }
   }
@@ -135,7 +135,7 @@ if (amplicon == "16S-V4") {
       truncQ = 2,
       rm.phix = TRUE,
       compress = TRUE,
-      multithread = threads
+      multithread = min(threads, 4)
     )
   } else if (quality == "bad") {
     out <- filterAndTrim(
@@ -147,7 +147,7 @@ if (amplicon == "16S-V4") {
       truncQ = 2,
       rm.phix = TRUE,
       compress = TRUE,
-      multithread = threads
+      multithread = min(threads, 4)
     )
   }
 } else if (amplicon == "18S-AMF" || amplicon == "18S-V4") {
@@ -161,7 +161,7 @@ if (amplicon == "16S-V4") {
       maxN = 0,
       rm.phix = TRUE,
       compress = TRUE,
-      multithread = threads,
+      multithread = min(threads, 4),
       verbose = TRUE
     )
   } else if (quality == "bad") {
@@ -174,7 +174,7 @@ if (amplicon == "16S-V4") {
       maxN = 0,
       rm.phix = TRUE,
       compress = TRUE,
-      multithread = threads,
+      multithread = min(threads, 4),
       verbose = TRUE
     )
   }
