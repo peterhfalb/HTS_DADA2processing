@@ -28,6 +28,8 @@ Optional arguments:
   --mumu-blast-id PCT       BLAST identity % for mumu (default: 94 for 16S-V4, 84 for others)
   --mumu-ratio RATIO        mumu minimum_ratio (default: 100 for 16S-V4, 1 for others)
   --jobs JOBS               Max parallel Snakemake jobs (default: 16)
+  --slurm-time TIME         SLURM walltime (HH:MM:SS, default: 12:00:00)
+  --slurm-mem MEM           SLURM memory allocation (default: 60gb)
   --help                    Show this help message
 
 Examples:
@@ -56,6 +58,8 @@ RUN_ITSX=0
 OTU_CLUSTER_ID="0.97"
 MUMU_BLAST_ID=""
 MUMU_RATIO=""
+SLURM_TIME="12:00:00"
+SLURM_MEM="60gb"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -126,6 +130,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --mumu-ratio)
             MUMU_RATIO="$2"
+            shift 2
+            ;;
+        --slurm-time)
+            SLURM_TIME="$2"
+            shift 2
+            ;;
+        --slurm-mem)
+            SLURM_MEM="$2"
             shift 2
             ;;
         --help)
@@ -255,9 +267,9 @@ LOG_FILE="$OUTPUT_DIR/logs/snakemake_${TIMESTAMP}.log"
 
 cat > "$SLURM_SCRIPT" << 'SCRIPT'
 #!/bin/bash -l
-#SBATCH --time=12:00:00
+#SBATCH --time=PLACEHOLDER_SLURM_TIME
 #SBATCH --ntasks=64
-#SBATCH --mem=60gb
+#SBATCH --mem=PLACEHOLDER_SLURM_MEM
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=PLACEHOLDER_EMAIL
 #SBATCH --job-name=dada2_PLACEHOLDER_AMPLICON
@@ -321,6 +333,8 @@ sed -i.bak "s|PLACEHOLDER_LOG|$LOG_FILE|g" "$SLURM_SCRIPT"
 sed -i.bak "s|PLACEHOLDER_OUTPUT_DIR|$OUTPUT_DIR|g" "$SLURM_SCRIPT"
 sed -i.bak "s|PLACEHOLDER_PIPELINE_DIR|$PIPELINE_DIR|g" "$SLURM_SCRIPT"
 sed -i.bak "s|PLACEHOLDER_JOBS|$JOBS|g" "$SLURM_SCRIPT"
+sed -i.bak "s|PLACEHOLDER_SLURM_TIME|$SLURM_TIME|g" "$SLURM_SCRIPT"
+sed -i.bak "s|PLACEHOLDER_SLURM_MEM|$SLURM_MEM|g" "$SLURM_SCRIPT"
 rm -f "$SLURM_SCRIPT.bak"
 
 chmod +x "$SLURM_SCRIPT"
@@ -546,6 +560,10 @@ if [ "$SKIP_OTU" -eq 0 ]; then
 else
     echo "--Skipping ASV2OTU--"
 fi
+echo ""
+echo "--SLURM RESOURCES--"
+echo "Walltime:         $SLURM_TIME"
+echo "Memory:           $SLURM_MEM"
 echo ""
 echo "--FILES AND DIRECTORIES--"
 echo "Input directory:  $FASTQ_DIR"
