@@ -77,32 +77,19 @@ else:
 EFFECTIVE_FWD = FWD_PRIMER_OVERRIDE if FWD_PRIMER_OVERRIDE else PRIMERS[AMPLICON]["fwd"]
 EFFECTIVE_REV = REV_PRIMER_OVERRIDE if REV_PRIMER_OVERRIDE else PRIMERS[AMPLICON]["rev"]
 
-# Load detected adapters from adapter auto-detection
-# Note: includes transposase sequences for read-through contamination on short amplicons (16S-V4, ITS)
+# Comprehensive default adapters for Nextera XT sequencing
+# Includes both index adapters and transposase sequences (for read-through on short amplicons)
+# Cutadapt will search all adapters in each read and trim matches
 DETECTED_ADAPTERS = {
     "adapters": [
-        "CTGTCTCTTATACACATCT",           # Nextera transposase (read-through R1, Illumina)
-        "AGATGTGTATAAGAGACAG",           # Nextera transposase RC (read-through R2, Illumina)
+        "CTGTCTCTTATACACATCT",           # Nextera transposase (read-through R1)
+        "AGATGTGTATAAGAGACAG",           # Nextera transposase RC (read-through R2)
         "ATCTCGTATGCCGTCTTCTGCTTG",      # i7 Nextera XT index adapter
         "CAAGCAGAAGACGGCATACGAGAT",      # i7 index adapter RC
         "GTGTAGATCTCGGTGGTCGCCGTATCATT", # i5 Nextera XT index adapter
         "AATGATACGGCGACCACCGAGATCTACAC", # i5 index adapter RC
     ]
 }
-
-# Try to load auto-detected adapters if available
-adapter_detection_json = os.path.join(OUTPUT_DIR, ".adapter_detection.json")
-if os.path.exists(adapter_detection_json):
-    try:
-        import json
-        with open(adapter_detection_json) as f:
-            adapter_data = json.load(f)
-            # Use the final_adapters list which combines detected + defaults
-            if "final_adapters" in adapter_data and adapter_data["final_adapters"]:
-                DETECTED_ADAPTERS["adapters"] = adapter_data["final_adapters"]
-    except Exception as e:
-        print(f"Warning: Could not load adapter detection results: {e}")
-        print("Using default Nextera XT adapters")
 
 # ============================================================================
 # Helper Functions
