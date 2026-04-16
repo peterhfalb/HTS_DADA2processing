@@ -267,7 +267,7 @@ def main():
         print()
         print("⚠️  IMPORTANT: Check the merge rate in QC stats!")
         print("If merge rate is very poor (<50%), consider using forward reads only")
-        print("(set justConcatenate=TRUE) rather than attempting to merge.")
+        print("(use --fwd-reads-only flag in run_dada2processing command) rather than attempting to merge.")
         print()
 
     if expected_fwd_found and expected_rev_found:

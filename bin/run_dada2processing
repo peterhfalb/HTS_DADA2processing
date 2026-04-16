@@ -525,6 +525,8 @@ if [ "$SKIP_OTU" -eq 0 ]; then
     echo "ITSx extraction:  $([ "$RUN_ITSX" -eq 1 ] && echo 'enabled' || echo 'disabled')"
     echo "mumu BLAST ID:    ${MUMU_BLAST_ID}%"
     echo "mumu ratio:       ${MUMU_RATIO}"
+else
+    echo "--Skipping ASV2OTU--"
 fi
 echo ""
 echo "--FILES AND DIRECTORIES--"
