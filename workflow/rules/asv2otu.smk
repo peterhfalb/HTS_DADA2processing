@@ -60,22 +60,20 @@ if RUN_ITSX and AMPLICON in ("ITS1", "ITS2"):
                 --cpu {threads} \
                 -o {params.outdir}/Centroid.ITSx 2>&1 | tee {log}
 
-            # Fix header format (ensure trailing semicolons)
-            sed 's/;size=/;size=/g' {params.outdir}/Centroid.ITSx.{params.region}.fasta > {params.outdir}/Centroid.ITSx.{params.region}.fixed.fasta
-
-            # Remove zero-abundance sequences
+            # Remove zero-abundance sequences (filter out sequences with size=0 annotations)
             awk '/^>/ {{
                 if (match($0, /;size=([0-9]+)/, a)) {{
                     size = a[1]
-                    if (size > 0) print
-                    else getline
-                }} else print
+                }} else {{
+                    size = 1  # Default to keep if no size annotation
+                }}
+                print_seq = (size > 0)
             }} !/^>/ {{
-                if (size > 0) print
-            }}' {params.outdir}/Centroid.ITSx.{params.region}.fixed.fasta > {params.outdir}/Centroid.ITSx.{params.region}.filtered.fasta
+                if (print_seq) print
+            }}' {params.outdir}/Centroid.ITSx.{params.region}.fasta > {params.outdir}/Centroid.ITSx.{params.region}.filtered.fasta
 
             # Clean up intermediate files (keep only the final filtered output)
-            rm -f {params.outdir}/Centroid.ITSx.{params.region}.fasta {params.outdir}/Centroid.ITSx.{params.region}.fixed.fasta
+            rm -f {params.outdir}/Centroid.ITSx.{params.region}.fasta
             """
 
 # ============================================================================
@@ -105,14 +103,8 @@ rule vsearch_cluster:
         cd {params.outdir}
         PIPELINE_DIR={params.pipeline_dir}
 
-        # Count input sequences
+        # Count input sequences (already ITSx-filtered if RUN_ITSX=true)
         INPUT_ASVS=$(grep -c "^>" {input.fasta})
-
-        # Count post-ITSx (if ITSx was used)
-        POST_ITSX="NA"
-        if grep -q "ITSx" "{input.fasta}"; then
-            POST_ITSX=$(grep -c "^>" {input.fasta})
-        fi
 
         # Step 1: Sort by abundance (size-based)
         vsearch --fasta_width 0 \
@@ -425,9 +417,11 @@ rule asv2otu_vsearch_readme:
     """Create README for VSEARCH clustering step"""
     output:
         OUTPUT_DIR + "/05_asv2otu/03_vsearch/README.txt",
+    params:
+        project_name=PROJECT_NAME,
     shell:
         """
-        cat > {output} << 'EOF'
+        cat > {output} << EOF
 # ASV to OTU Pipeline - Step 3: VSEARCH Clustering & Chimera Removal
 ## Directory: 05_asv2otu/03_vsearch/
 
@@ -436,8 +430,8 @@ This directory contains OTU sequences after clustering and chimera detection.
 ### Contents:
 
 **Output Files:**
-- `{PROJECT_NAME}.centroids`: Representative sequences for each OTU (after clustering, before chimera removal)
-- `{PROJECT_NAME}.otutable`: OTU abundance table with sample counts (post-chimera removal)
+- `{params.project_name}.centroids`: Representative sequences for each OTU (after clustering, before chimera removal)
+- `{params.project_name}.otutable`: OTU abundance table with sample counts (post-chimera removal)
 - `otu_processing_summary.txt`: QC statistics for clustering and chimera removal steps
 
 **QC Metrics (from otu_processing_summary.txt):**
@@ -462,9 +456,11 @@ rule asv2otu_mumu_readme:
     """Create README for mumu curation step"""
     output:
         OUTPUT_DIR + "/05_asv2otu/04_mumu/README.txt",
+    params:
+        project_name=PROJECT_NAME,
     shell:
         """
-        cat > {output} << 'EOF'
+        cat > {output} << EOF
 # ASV to OTU Pipeline - Step 4: mumu Curation
 ## Directory: 05_asv2otu/04_mumu/
 
@@ -473,7 +469,7 @@ This directory contains OTU sequences and abundance table after mumu-based curat
 ### Contents:
 
 **Output Files:**
-- `{PROJECT_NAME}_mumu_curated.txt`: Curated OTU abundance table with mumu-selected OTUs only
+- `{params.project_name}_mumu_curated.txt`: Curated OTU abundance table with mumu-selected OTUs only
 - `Centroid_mumu_curated.fas`: Representative sequences for curated OTUs with abundance annotations
 
 ### Processing Details:

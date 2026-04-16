@@ -1,0 +1,22 @@
+{
+  "16S-V4": {
+    "fwd": "GTGYCAGCMGCCGCGGTAA",
+    "rev": "GGACTACNVGGGTWTCTAAT"
+  },
+  "ITS1": {
+    "fwd": "CTTGGTCATTTAGAGGAAGTAA",
+    "rev": "GCTGCGTTCTTCATCGATGC"
+  },
+  "ITS2": {
+    "fwd": "TCGATGAAGAACGCAGCG",
+    "rev": "TCCTCCGCTTATTGATATGC"
+  },
+  "18S-AMF": {
+    "fwd": "CAGCCGCGGTAATTCCAGCT",
+    "rev": "GAACCCAAACACTTTGGTTTCC"
+  },
+  "18S-V4": {
+    "fwd": "TTAAARVGYTCGTAGTYG",
+    "rev": "CCGTCAATTHCTTYAART"
+  }
+}

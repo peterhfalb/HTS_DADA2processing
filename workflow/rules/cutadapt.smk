@@ -18,19 +18,25 @@ rule trim_adapters:
         json=OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.json",
     log:
         OUTPUT_DIR + "/.logs/cutadapt_adapter_{sample}.log",
-    shell:
-        """
+    threads: 8
+    run:
+        # Build adapter flags from detected adapters
+        adapter_flags = ""
+        adapters = DETECTED_ADAPTERS["adapters"]
+        # Apply each detected adapter to both R1 (-a/-g) and R2 (-A/-G)
+        # Assuming 3' end adapters, add to both -a and -A flags
+        for adapter in adapters:
+            adapter_flags += f" -a {adapter} -A {adapter}"
+
+        shell(f"""
         mkdir -p $(dirname {output.log})
-        cutadapt --cores 8 --pair-filter=any --minimum-length 150 \
-          -a TATGGTAATTGTGTGNCAGCNGCCGCGGTAA \
-          -g ATTAGANACCCNNGTAGTCCGGCTGGCTGACT \
-          -A AGTCAGCCAGCCGGACTACNVGGGTNTCTAAT \
+        cutadapt --cores {threads} --pair-filter=any --minimum-length 150 {adapter_flags} \
           --json={output.json} \
           -o {output.r1} \
           -p {output.r2} \
           {input.r1} {input.r2} \
           > {output.log} 2>&1
-        """
+        """)
 
 rule summarize_adapter_logs:
     """Aggregate adapter trimming log statistics"""
@@ -88,10 +94,11 @@ rule trim_primers:
         rev_primer=EFFECTIVE_REV,
     log:
         OUTPUT_DIR + "/.logs/cutadapt_primers_{sample}.log",
+    threads: 4
     shell:
         """
         mkdir -p $(dirname {output.log})
-        cutadapt --cores 4 --pair-filter=any --minimum-length 100 --discard-untrimmed \
+        cutadapt --cores {threads} --pair-filter=any --minimum-length 100 --discard-untrimmed \
           -g {params.fwd_primer} \
           -G {params.rev_primer} \
           --json={output.json} \
@@ -111,12 +118,14 @@ rule summarize_primer_logs:
     output:
         summary=OUTPUT_DIR + "/02_primer_trimmed/summary_primer_trimming.txt",
         readme=OUTPUT_DIR + "/02_primer_trimmed/README.txt",
+    params:
+        amplicon=AMPLICON,
     log:
         OUTPUT_DIR + "/.logs/primer_summary.log",
     shell:
         """
         grep "passing" {input.logs} > {output.summary} 2>&1 || true
-        cat > {output.readme} << 'EOF'
+        cat > {output.readme} << EOF
 # Primer Trimming Results
 ## Directory: 02_primer_trimmed/
 
@@ -132,7 +141,7 @@ Reads without both primers have been discarded.
 ### Parameters:
 - Min length: 100 bp
 - Discard untrimmed: Yes (requires both primers present)
-- Amplicon type: {amplicon}
+- Amplicon type: {params.amplicon}
 
 ### Next step:
 DADA2 denoising and taxonomy assignment in 03_dada2/

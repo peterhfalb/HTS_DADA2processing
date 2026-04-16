@@ -272,15 +272,6 @@ for (sname in sample_names) {
   }
 }
 
-# Add reads_after_adapter and reads_after_primer (exact counts from JSON)
-#qc_df$reads_after_adapter <- NA
-#for (sname in sample_names) {
-#  if (sname %in% names(adapter_stats) && !is.na(adapter_stats[[sname]]$output)) {
-#    qc_df[sname, "reads_after_adapter"] <- adapter_stats[[sname]]$output
-#  }
-#}
-
-
 # Add adapter stats
 qc_df$adapter_fwd_pct <- NA
 qc_df$adapter_rev_pct <- NA
@@ -542,7 +533,6 @@ tryCatch({
   # Define all possible steps in order
   step_defs <- list(
     list(name = "Start",          col = "reads_start"),
-    list(name = "After Adapter",  col = "reads_after_adapter"),
     list(name = "After Primer",   col = "reads_after_primer"),
     list(name = "DADA2 Input",    col = "reads_dada2_input"),
     list(name = "After Filter",   col = "dada2_filtered"),

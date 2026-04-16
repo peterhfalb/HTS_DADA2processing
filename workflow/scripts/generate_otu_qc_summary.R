@@ -11,7 +11,8 @@ if (length(args) < 3) {
 
 OUTPUT_DIR  <- args[1]
 PROJECT     <- args[2]
-RUN_ITSX    <- args[3] == "1"
+# Parse boolean: handle "1", "true", "True", "yes", etc.
+RUN_ITSX    <- tolower(args[3]) %in% c("1", "true", "yes")
 
 cat("Generating OTU QC Summary...\n")
 cat("Output dir: ", OUTPUT_DIR, "\n")
@@ -117,7 +118,8 @@ if (!is.na(otus_pre_mumu) && !is.na(otus_post_mumu)) {
 
 # 7. After taxonomy assignment
 tax_dir <- file.path(otu_dir, "05_taxonomy")
-tax_file <- file.path(tax_dir, list.files(tax_dir, pattern = "_combined.txt$")[1])
+tax_files <- list.files(tax_dir, pattern = "_combined.txt$")
+tax_file <- if (length(tax_files) > 0) file.path(tax_dir, tax_files[1]) else NA
 otus_with_tax <- NA
 pct_with_tax <- NA
 

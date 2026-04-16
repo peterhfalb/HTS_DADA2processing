@@ -3,8 +3,6 @@
 # Prepares a single combined FASTA and abundance table from a combined ASV+taxonomy table
 # Usage: Rscript prepare_otu_input.R <asv_table_path> <output_dir>
 
-options(repos = c(CRAN = "https://cloud.r-project.org"))
-
 library(dplyr)
 library(tidyr)
 library(readr)

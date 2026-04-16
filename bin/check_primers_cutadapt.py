@@ -13,7 +13,16 @@ import tempfile
 import glob
 from pathlib import Path
 
-# Primer reference database
+# Load primer reference database from external JSON config (single source of truth)
+# Extended with additional primer variants for comprehensive detection
+script_dir = os.path.dirname(os.path.abspath(__file__))
+pipeline_dir = os.path.dirname(script_dir)
+primers_json_path = os.path.join(pipeline_dir, "workflow/config/primers.json")
+
+with open(primers_json_path) as f:
+    base_primers = json.load(f)
+
+# Build extended forward and reverse primer databases with variants
 PRIMER_FWD = {
     "ITS1F": "CTTGGTCATTTAGAGGAAGTAA",
     "ITS1F_KYO1": "CTHGGTCATTTAGAGGAASTAA",
@@ -26,6 +35,9 @@ PRIMER_FWD = {
     "F04": "GCTTGTCTCAAAGATTAAGCC",
     "616f": "TTAAARVGYTCGTAGTYG",
 }
+# Add base primers with amplicon names as keys
+for amplicon, primers in base_primers.items():
+    PRIMER_FWD[f"{amplicon}_fwd"] = primers["fwd"]
 
 PRIMER_REV = {
     "ITS2": "GCTGCGTTCTTCATCGATGC",
@@ -39,6 +51,9 @@ PRIMER_REV = {
     "R22": "GCCTGCTGCCTTCCTTGGA",
     "1132r": "CCGTCAATTHCTTTYAART",
 }
+# Add base primers with amplicon names as keys
+for amplicon, primers in base_primers.items():
+    PRIMER_REV[f"{amplicon}_rev"] = primers["rev"]
 
 
 def find_fastq_files(fastq_dir):
@@ -118,7 +133,8 @@ def run_cutadapt_primer_search(r1_file, r2_file, primers_dict, is_reverse=False)
         elif isinstance(read_counts_data, int):
             total_reads = read_counts_data
         else:
-            total_reads = 1
+            print(f"WARNING: Could not determine total read count from cutadapt JSON", file=sys.stderr)
+            total_reads = 0
 
         # Parse adapters from either old format (adapters) or new format (adapters_read1/adapters_read2)
         adapters_list = []

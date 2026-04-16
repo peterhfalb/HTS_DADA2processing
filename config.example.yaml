@@ -1,0 +1,77 @@
+# DADA2 Snakemake Pipeline Configuration Template
+# Copy this file to config.yaml and customize for your project
+
+# ============================================================================
+# REQUIRED PARAMETERS
+# ============================================================================
+
+# Amplicon type: 16S-V4, ITS1, ITS2, 18S-AMF, or 18S-V4
+amplicon: "16S-V4"
+
+# Sequencing platform: illumina, aviti, or pacbio
+platform: "illumina"
+
+# Data quality: raw or trimmed (raw = demultiplexed FASTQ, trimmed = already adapter-trimmed)
+quality: "raw"
+
+# Path to directory containing input FASTQ files
+fastq_dir: "/path/to/fastq/directory"
+
+# Path to output directory (will be created if it doesn't exist)
+output_dir: "/path/to/output/directory"
+
+# Project name (used in output filenames and README files)
+project_name: "my_project"
+
+# Email address for SLURM job notifications
+email: "user@example.com"
+
+# Sample list: provide either:
+#   1. A list of sample names (FASTQ files should be: <fastq_dir>/<sample>_R1_001.fastq.gz and <sample>_R2_001.fastq.gz)
+#   2. OR a path to a sample file (one sample per line)
+samples:
+  - sample_001
+  - sample_002
+  - sample_003
+
+# ============================================================================
+# OPTIONAL PARAMETERS (uncomment and customize as needed)
+# ============================================================================
+
+# Forward-reads-only mode: process single-end reads instead of paired-end
+# Default: 0 (use paired-end). Set to 1 to process forward reads only.
+# fwd_reads_only: "0"
+
+# Skip OTU clustering and taxonomy assignment; only run DADA2 ASV denoising
+# Default: 0 (run full pipeline). Set to 1 to skip OTU pipeline.
+# skip_otu: "0"
+
+# Run ITSx filtering to remove non-ITS sequences (recommended for ITS amplicons)
+# Default: 0 (no filtering). Set to 1 to filter with ITSx.
+# run_itsx: "0"
+
+# OTU clustering identity threshold (range: 0.0-1.0)
+# Default: 0.97 (97% identity OTUs, standard for 16S)
+# otu_cluster_id: "0.97"
+
+# MUMU curation: BLAST identity threshold for merging OTUs (range: 0-100)
+# Default: 84 (84% identity, balances sensitivity and specificity)
+# mumu_blast_id: "84"
+
+# MUMU curation: Abundance ratio threshold for merging OTUs (range: 0-100)
+# Default: 1 (OTU must be >=1% of parent OTU abundance to survive)
+# mumu_ratio: "1"
+
+# Override default taxonomy database for this amplicon
+# Options: SILVA, UNITE, PR2, MaarjAM, EukaryomeSSU, EukaryomeITS
+# Default: SILVA (16S-V4), UNITE (ITS1/ITS2), PR2 (18S-V4), MaarjAM (18S-AMF)
+# taxonomy_db_override: "SILVA"
+
+# Override forward primer sequence (use if default primers don't match your amplicon)
+# Format: DNA sequence (A, T, G, C, R, Y, W, S, K, M, B, D, H, V, N supported)
+# Default: amplicon-specific primers from workflow/config/primers.json
+# fwd_primer_override: "GTGYCAGCMGCCGCGGTAA"
+
+# Override reverse primer sequence
+# Default: amplicon-specific primers from workflow/config/primers.json
+# rev_primer_override: "GGACTACNVGGGTWTCTAAT"

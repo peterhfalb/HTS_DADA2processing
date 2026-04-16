@@ -35,29 +35,11 @@ OTU_CLUSTER_ID  = config.get("otu_cluster_id", "0.97")
 MUMU_BLAST_ID   = config.get("mumu_blast_id", "84")
 MUMU_RATIO      = config.get("mumu_ratio", "1")
 
-# Primer sequences (forward and reverse) per amplicon type
-PRIMERS = {
-    "16S-V4": {
-        "fwd": "GTGYCAGCMGCCGCGGTAA",
-        "rev": "GGACTACNVGGGTWTCTAAT",
-    },
-    "ITS1": {
-        "fwd": "CTTGGTCATTTAGAGGAAGTAA",
-        "rev": "GCTGCGTTCTTCATCGATGC",
-    },
-    "ITS2": {
-        "fwd": "TCGATGAAGAACGCAGCG",
-        "rev": "TCCTCCGCTTATTGATATGC",
-    },
-    "18S-AMF": {
-        "fwd": "CAGCCGCGGTAATTCCAGCT",
-        "rev": "GAACCCAAACACTTTGGTTTCC",
-    },
-    "18S-V4": {
-        "fwd": "TTAAARVGYTCGTAGTYG",
-        "rev": "CCGTCAATTHCTTYAART",
-    },
-}
+# Load primer sequences from external config file (single source of truth)
+import json
+primers_config_path = os.path.join(workflow.basedir, "workflow/config/primers.json")
+with open(primers_config_path) as f:
+    PRIMERS = json.load(f)
 
 # Taxonomy database paths on MSI Agate
 TAXONOMY_DB = {
@@ -94,6 +76,30 @@ DB_NAME = TAXONOMY_DB_OVERRIDE if TAXONOMY_DB_OVERRIDE else TAXONOMY_DB_DEFAULT_
 # Resolve effective primers
 EFFECTIVE_FWD = FWD_PRIMER_OVERRIDE if FWD_PRIMER_OVERRIDE else PRIMERS[AMPLICON]["fwd"]
 EFFECTIVE_REV = REV_PRIMER_OVERRIDE if REV_PRIMER_OVERRIDE else PRIMERS[AMPLICON]["rev"]
+
+# Load detected adapters from adapter auto-detection
+DETECTED_ADAPTERS = {
+    "adapters": [
+        "ATCTCGTATGCCGTCTTCTGCTTG",      # i7 Nextera XT (default)
+        "CAAGCAGAAGACGGCATACGAGAT",      # i7 reverse complement (default)
+        "GTGTAGATCTCGGTGGTCGCCGTATCATT", # i5 Nextera XT (default)
+        "AATGATACGGCGACCACCGAGATCTACAC", # i5 reverse complement (default)
+    ]
+}
+
+# Try to load auto-detected adapters if available
+adapter_detection_json = os.path.join(OUTPUT_DIR, ".adapter_detection.json")
+if os.path.exists(adapter_detection_json):
+    try:
+        import json
+        with open(adapter_detection_json) as f:
+            adapter_data = json.load(f)
+            # Use the final_adapters list which combines detected + defaults
+            if "final_adapters" in adapter_data and adapter_data["final_adapters"]:
+                DETECTED_ADAPTERS["adapters"] = adapter_data["final_adapters"]
+    except Exception as e:
+        print(f"Warning: Could not load adapter detection results: {e}")
+        print("Using default Nextera XT adapters")
 
 # ============================================================================
 # Helper Functions

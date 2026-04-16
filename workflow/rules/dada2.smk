@@ -44,8 +44,12 @@ def get_primer_jsons(wildcards):
 rule dada2:
     """DADA2 denoising and taxonomy assignment"""
     input:
-        reads=expand(
+        reads_r1=expand(
             OUTPUT_DIR + "/02_primer_trimmed/{sample}_R1_001.fastq.gz",
+            sample=SAMPLES,
+        ),
+        reads_r2=expand(
+            OUTPUT_DIR + "/02_primer_trimmed/{sample}_R2_001.fastq.gz",
             sample=SAMPLES,
         ),
     output:
@@ -94,6 +98,8 @@ rule dada2_readme:
     params:
         amplicon=AMPLICON,
         quality=QUALITY,
+        project_name=PROJECT_NAME,
+        db_name=DB_NAME,
     shell:
         """
         cat > {output} << EOF
@@ -120,8 +126,8 @@ This directory contains the final DADA2 output including denoised ASVs and taxon
 - `taxID_bootstrap.rds`: Bootstrap confidence values for taxonomy
 
 **Combined Results:**
-- `{params.amplicon}_combined_sequences_taxa.txt`: Sequence abundance table with taxonomy
-- `{params.amplicon}_combined_sequences_taxa_bootstrap.txt`: Sequence abundance with taxonomy and bootstrap values
+- `{params.project_name}__combined_sequences_ASVtaxa_{params.db_name}.txt`: ASV abundance table with taxonomy
+- `{params.project_name}__combined_sequences_ASVtaxa_bootstrap_{params.db_name}.txt`: ASV abundance with taxonomy and bootstrap values
 
 **Processing Details:**
 - Amplicon type: {params.amplicon}

@@ -18,7 +18,8 @@ threads <- as.numeric(args[5])
 project_name <- args[6]
 db_name <- args[7]
 platform <- tolower(args[8])
-fwd_reads_only <- as.logical(as.integer(args[9]))
+# Parse boolean: handle "1", "true", "True", "yes", etc.
+fwd_reads_only <- tolower(args[9]) %in% c("1", "true", "yes")
 
 cat("DADA2 Pipeline\n")
 cat("==============\n")
@@ -69,6 +70,58 @@ names(filtRs) <- sample.names
 cat("FILTERING\n")
 cat("=========\n")
 
+# Helper function to get filterAndTrim parameters based on amplicon, quality, and platform
+get_filter_params <- function(amplicon, quality, platform) {
+  # Base parameters (always included)
+  base_params <- list(
+    maxN = 0,
+    rm.phix = TRUE,
+    compress = TRUE,
+    multithread = min(threads, 4),
+    verbose = TRUE
+  )
+
+  # Amplicon-specific parameters
+  if (amplicon == "16S-V4") {
+    if (platform == "aviti") {
+      params <- c(base_params, list(truncLen = c(240, 220), truncQ = 5))
+      if (quality == "bad") params$maxEE <- c(4, 6) else params$maxEE <- c(2, 2)
+      params$minLen <- 100
+    } else {  # Illumina
+      params <- c(base_params, list(truncLen = c(240, 200), truncQ = 2))
+      if (quality == "bad") params$maxEE <- c(4, 6) else params$maxEE <- c(2, 4)
+      params$minLen <- 100
+    }
+  } else if (amplicon == "ITS1" || amplicon == "ITS2") {
+    params <- c(base_params, list(truncQ = 2, minLen = 50))
+    if (quality == "bad") {
+      params$maxEE <- c(4, 4)
+      params$truncLen <- c(240, 175)
+    } else {
+      params$maxEE <- c(2, 2)
+    }
+  } else if (amplicon == "18S-AMF" || amplicon == "18S-V4") {
+    params <- c(base_params, list(truncQ = 5, minLen = 100))
+    if (quality == "bad") params$maxEE <- c(4, 6) else params$maxEE <- c(2, 4)
+    params$matchIDs <- TRUE
+  } else {
+    stop("Unknown amplicon type: ", amplicon)
+  }
+
+  return(params)
+}
+
+# Get parameters and execute filterAndTrim with minimal code duplication
+filter_params <- get_filter_params(amplicon, quality, platform)
+out <- do.call(filterAndTrim, c(
+  list(fnFs, filtFs, fnRs, filtRs),
+  filter_params
+))
+
+# ==============================================================================
+# LEGACY CODE REMOVED - Replaced with helper function above
+# ==============================================================================
+if (FALSE) {  # Disabled - functionality moved to get_filter_params()
 if (amplicon == "16S-V4") {
   if (platform == "aviti") {
     # Aviti platform-specific settings for 16S-V4
@@ -181,6 +234,7 @@ if (amplicon == "16S-V4") {
 } else {
   stop("Unknown amplicon type: ", amplicon)
 }
+}  # End of if (FALSE) block - legacy code
 
 head(out)
 cat("\n")
@@ -283,7 +337,7 @@ if (platform == "aviti") {
     seqtab,
     method = "per-sample",
     minFoldParentOverAbundance = 8,
-    multithread = TRUE,
+    multithread = threads,
     verbose = TRUE
   )
 } else {
@@ -294,7 +348,7 @@ if (platform == "aviti") {
   seqtab.nochim <- removeBimeraDenovo(
     seqtab,
     method = "consensus",
-    multithread = TRUE,
+    multithread = threads,
     verbose = TRUE
   )
 }

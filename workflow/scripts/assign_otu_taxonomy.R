@@ -1,8 +1,6 @@
 # RDP Taxonomy Assignment via DADA2
 # Usage: Rscript 05_assign_taxonomy_rdp.R <fasta> <database> <output> <threads>
 
-options(repos = c(CRAN = "https://cloud.r-project.org"))  # set CRAN mirror
-
 library(dplyr)
 library(tidyr)
 library(readr)

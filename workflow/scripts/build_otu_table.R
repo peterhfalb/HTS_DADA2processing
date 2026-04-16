@@ -3,9 +3,6 @@
 # then summing per-sample abundances from the original ASV abundance table
 # Usage: Rscript 03_build_otu_table.R <uc_file> <asv_abundance_table> <output_file>
 
-
-options(repos = c(CRAN = "https://cloud.r-project.org"))  # set CRAN mirror
-
 library(dplyr)
 library(tidyr)
 library(readr)
