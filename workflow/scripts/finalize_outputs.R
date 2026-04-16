@@ -85,12 +85,12 @@ if (!SKIP_OTU && file.exists(otu_qc_path)) {
   cat("✓ Found OTU QC summary\n")
 
   # Append blank line, section header, and OTU QC section
-  blank_row <- as.data.frame(matrix(NA_character_, nrow = 1, ncol = ncol(qc_final)))
+  blank_row <- as.data.frame(matrix(NA, nrow = 1, ncol = ncol(qc_final)))
   names(blank_row) <- names(qc_final)
   qc_final <- bind_rows(qc_final, blank_row)
 
   # Add section header
-  header_row <- as.data.frame(matrix(NA_character_, nrow = 1, ncol = ncol(qc_final)))
+  header_row <- as.data.frame(matrix(NA, nrow = 1, ncol = ncol(qc_final)))
   names(header_row) <- names(qc_final)
   header_row[[1]] <- "# ASV to OTU QC Summary"
   qc_final <- bind_rows(qc_final, header_row)
@@ -100,7 +100,7 @@ if (!SKIP_OTU && file.exists(otu_qc_path)) {
 
   # Add each OTU metric as a data row
   for (i in seq_len(nrow(otu_qc))) {
-    metric_row <- as.data.frame(matrix(NA_character_, nrow = 1, ncol = ncol(qc_final)))
+    metric_row <- as.data.frame(matrix(NA, nrow = 1, ncol = ncol(qc_final)))
     names(metric_row) <- names(qc_final)
     metric_row[[1]] <- paste(otu_qc[[i, 1]], otu_qc[[i, 2]], sep = ": ")
     qc_final <- bind_rows(qc_final, metric_row)
