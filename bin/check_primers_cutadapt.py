@@ -2,7 +2,7 @@
 """
 Primer detection using cutadapt
 Searches raw FASTQ files for all known primers and reports which ones are found
-Usage: python3 check_primers_cutadapt.py <fastq_dir> <expected_fwd_primer> <expected_rev_primer> <amplicon>
+Usage: python3 check_primers_cutadapt.py <fastq_dir> <expected_fwd_primer> <expected_rev_primer> <amplicon> <output_dir>
 """
 
 import subprocess
@@ -139,14 +139,15 @@ def run_cutadapt_primer_search(r1_file, r2_file, primers_dict, is_reverse=False)
 
 
 def main():
-    if len(sys.argv) < 5:
-        print("Usage: check_primers_cutadapt.py <fastq_dir> <expected_fwd> <expected_rev> <amplicon>")
+    if len(sys.argv) < 6:
+        print("Usage: check_primers_cutadapt.py <fastq_dir> <expected_fwd> <expected_rev> <amplicon> <output_dir>")
         sys.exit(1)
 
     fastq_dir = sys.argv[1]
     expected_fwd = sys.argv[2]
     expected_rev = sys.argv[3]
     amplicon = sys.argv[4]
+    output_dir = sys.argv[5]
 
     print("Primer Detection with Cutadapt")
     print("=" * 50)
@@ -320,7 +321,8 @@ def main():
     }
 
     # Write detected primers to a JSON file for the bash script to read
-    json_output_path = os.path.join(fastq_dir, ".primer_detection.json")
+    # Save to output_dir to avoid permission issues with shared FASTQ directories
+    json_output_path = os.path.join(output_dir, ".primer_detection.json")
     with open(json_output_path, "w") as f:
         json.dump(detected_primers, f, indent=2)
 

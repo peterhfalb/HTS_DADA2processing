@@ -369,7 +369,7 @@ echo ""
 
 # Run primer check using cutadapt
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-python3 "$SCRIPT_DIR/check_primers_cutadapt.py" "$FASTQ_DIR" "$VALIDATE_FWD" "$VALIDATE_REV" "$AMPLICON" || {
+python3 "$SCRIPT_DIR/check_primers_cutadapt.py" "$FASTQ_DIR" "$VALIDATE_FWD" "$VALIDATE_REV" "$AMPLICON" "$OUTPUT_DIR" || {
   echo ""
   echo "ERROR: Primer validation failed"
   echo "Please check that:"
@@ -378,8 +378,8 @@ python3 "$SCRIPT_DIR/check_primers_cutadapt.py" "$FASTQ_DIR" "$VALIDATE_FWD" "$V
   exit 1
 }
 
-# Read detected primers from JSON file
-PRIMER_JSON="$FASTQ_DIR/.primer_detection.json"
+# Read detected primers from JSON file (saved in output_dir to avoid permission issues)
+PRIMER_JSON="$OUTPUT_DIR/.primer_detection.json"
 if [[ -f "$PRIMER_JSON" ]]; then
   # Extract detected primers using jq (if available) or python
   if command -v jq &> /dev/null; then
