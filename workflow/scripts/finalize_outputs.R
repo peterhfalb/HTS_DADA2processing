@@ -32,14 +32,14 @@ cat("DB:          ", DB_NAME, "\n")
 cat("Skip OTU:    ", SKIP_OTU, "\n\n")
 
 # ============================================================================
-# 1. Copy ASV table to main directory
+# 1. Copy ASV table with bootstrap values to main directory
 # ============================================================================
-asv_source <- paste0("03_dada2/", PROJECT, "__combined_sequences_ASVtaxa_", DB_NAME, ".txt")
-asv_dest <- paste0(PROJECT, "__combined_sequences_ASVtaxa_", DB_NAME, ".txt")
+asv_source <- paste0("03_dada2/", PROJECT, "__combined_sequences_ASVtaxa_bootstrap_", DB_NAME, ".txt")
+asv_dest <- paste0(PROJECT, "__combined_sequences_ASVtaxa_bootstrap_", DB_NAME, ".txt")
 
 if (file.exists(asv_source)) {
   file.copy(asv_source, asv_dest, overwrite = TRUE)
-  cat("✓ Copied ASV table to main directory: ", asv_dest, "\n")
+  cat("✓ Copied ASV table with bootstrap values to main directory: ", asv_dest, "\n")
 } else {
   warning("ASV table not found: ", asv_source)
 }

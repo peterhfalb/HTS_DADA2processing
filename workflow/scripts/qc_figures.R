@@ -282,8 +282,20 @@ qc_df$adapter_fwd_pct <- NA
 qc_df$adapter_rev_pct <- NA
 for (sname in sample_names) {
   if (sname %in% names(adapter_stats)) {
-    qc_df[sname, "adapter_fwd_pct"] <- adapter_stats[[sname]]$pct_r1
-    qc_df[sname, "adapter_rev_pct"] <- adapter_stats[[sname]]$pct_r2
+    # For Illumina cutadapt: use per-read adapter counts
+    if (!is.na(adapter_stats[[sname]]$pct_r1)) {
+      qc_df[sname, "adapter_fwd_pct"] <- adapter_stats[[sname]]$pct_r1
+    } else if (!is.na(adapter_stats[[sname]]$pct_removed)) {
+      # For Aviti Trimmomatic: use overall removal % (no per-read data available)
+      qc_df[sname, "adapter_fwd_pct"] <- adapter_stats[[sname]]$pct_removed
+    }
+
+    if (!is.na(adapter_stats[[sname]]$pct_r2)) {
+      qc_df[sname, "adapter_rev_pct"] <- adapter_stats[[sname]]$pct_r2
+    } else if (!is.na(adapter_stats[[sname]]$pct_removed)) {
+      # For Aviti Trimmomatic: use overall removal % (no per-read data available)
+      qc_df[sname, "adapter_rev_pct"] <- adapter_stats[[sname]]$pct_removed
+    }
   }
 }
 
