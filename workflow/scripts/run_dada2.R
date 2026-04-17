@@ -233,7 +233,7 @@ if (platform == "aviti") {
     seqtab,
     method = "per-sample",
     minFoldParentOverAbundance = 8,
-    multithread = threads,
+    multithread = min(threads, 8),
     verbose = TRUE
   )
 } else {
@@ -244,7 +244,7 @@ if (platform == "aviti") {
   seqtab.nochim <- removeBimeraDenovo(
     seqtab,
     method = "consensus",
-    multithread = threads,
+    multithread = min(threads, 8),
     verbose = TRUE
   )
 }
