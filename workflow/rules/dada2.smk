@@ -165,12 +165,13 @@ rule dada2_qc:
         platform  = PLATFORM,
         dada2_dir = OUTPUT_DIR + "/03_dada2",
         primer_trimmed_dir = OUTPUT_DIR + "/02_primer_trimmed",
+        pipeline_dir = workflow.basedir,
     log:
         OUTPUT_DIR + "/.logs/qc.log",
     shell:
         """
         mkdir -p {params.outdir}/figures
-        Rscript workflow/scripts/qc_figures.R \
+        Rscript {params.pipeline_dir}/workflow/scripts/qc_figures.R \
           {params.outdir} {params.amplicon} {params.platform} \
           {input.dada2_summary} {params.dada2_dir} \
           {params.primer_trimmed_dir} \
