@@ -314,6 +314,7 @@ conda activate $DADA2_ENV
 set -u  # Re-enable strict mode
 
 snakemake \
+  --directory "$OUTPUT_DIR" \
   --snakefile "$PIPELINE_DIR/Snakefile" \
   --configfile "$CONFIG_FILE" \
   --cores $SLURM_NTASKS \
