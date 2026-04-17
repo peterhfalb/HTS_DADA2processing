@@ -116,8 +116,16 @@ get_filter_params <- function(amplicon, quality, platform) {
 
 # Get parameters and execute filterAndTrim with minimal code duplication
 filter_params <- get_filter_params(amplicon, quality, platform)
+
 if (fwd_reads_only) {
   # Forward-only: filter R1 only
+  # Adjust paired-end parameters to single-end values (use first element)
+  if ("truncLen" %in% names(filter_params) && length(filter_params$truncLen) > 1) {
+    filter_params$truncLen <- filter_params$truncLen[1]
+  }
+  if ("maxEE" %in% names(filter_params) && length(filter_params$maxEE) > 1) {
+    filter_params$maxEE <- filter_params$maxEE[1]
+  }
   out <- do.call(filterAndTrim, c(list(fnFs, filtFs), filter_params))
 } else {
   # Paired-end: filter R1 and R2
