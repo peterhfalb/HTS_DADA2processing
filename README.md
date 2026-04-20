@@ -151,6 +151,10 @@ To run the script, ssh login to the cluster and run `run_dada2processing` from a
         The MUMU algorithm requires a minimum average ratio between parent-daughter abundances for them to be accepted as a merge. By default it is 100 for 16S and 1 for all other datasets. Increase the minimum ratio if you want MUMU merges to be more stringent/conservative.
 9. Keep only forward reads (`--fwd-reads-only`)
         You can discard you reverse reads if merging is failing/discarding many of your reads due to lack of overlap or poor R2 quality. This will usually not be relevant but may be desired for 18S-V4 datasets.
+10. Change default wall-time (runtime) on cluster (`--slurm-time`)
+        If you have a large amount of samples or really large sequence files with high read depth, OR if a previous run attempt failed because it ran of of time, you may need to extend the time on the cluster using this command. The defaults should be suitable for datasets up to 200+ samples.
+11. Change default memory allocation (`--slurm-mem`)
+        If a previous job failed due to running out of memory. Up your memory allocation using this command. The default (80gb) should be suitable for most all datasets.
 
 Expect a runtime of 10 - 120 minutes. It should not go much longer than that, but the SLURM script requests 12 hours of time on the cluster just in case.
 
