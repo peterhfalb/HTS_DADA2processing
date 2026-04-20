@@ -134,38 +134,27 @@ To run the script, ssh login to the cluster and run `run_dada2processing` from a
 
 *Optional:*
 1. Sequence quality (`--quality`)
-        
-        Right now, the default for sequence quality is `good`, by setting to `bad`, some of the filtering parameters in DADA2 become more stringent. Reach out to Trevor Gould or the UMGC for further information as to whether you sequencing run is *good* or *bad* quality.
+Right now, the default for sequence quality is `good`, by setting to `bad`, some of the filtering parameters in DADA2 become more stringent. Reach out to Trevor Gould or the UMGC for further information as to whether you sequencing run is *good* or *bad* quality.
 2. Taxonomy database - if using something other than default (`-taxonomy-database`)
-        
-        Manually specify a reference database for taxonomy assignment other than default. Mostly relevant for 18S-V4 and 18S-AMF (and possibly AMF). Defaults is usually the best.
+Manually specify a reference database for taxonomy assignment other than default. Mostly relevant for 18S-V4 and 18S-AMF (and possibly AMF). Defaults is usually the best.
 3. Forward/Reverse Primer Sequence (`--fwd-primer/--rev-primer`)
-        
-        Use to manually input a primer sequence if either a. the pipeline detects a different primer than default or b. you used a non-canonical primer not included on the Kennedy Lab primer list.
+Use to manually input a primer sequence if either a. the pipeline detects a different primer than default or b. you used a non-canonical primer not included on the Kennedy Lab primer list.
 4. Whether to skip OTUing (`--skip-otu`)
-        
-        OTUing is generally recommended under the following scenarios: bulk environmental non-host-associated soil samples, Aviti sequencing, non-bacterial primer sets (ITS, 18S). OTUing is however generally applicable across all datasets and will serve to further reduce possible noise in the dataset.
+OTUing is generally recommended under the following scenarios: bulk environmental non-host-associated soil samples, Aviti sequencing, non-bacterial primer sets (ITS, 18S). OTUing is however generally applicable across all datasets and will serve to further reduce possible noise in the dataset.
 5. Whether to run ITSx (`--run-ITSx`)
-        
-        *ITSx is a program which removes the highly conserved regions flanking the ITS variable region. While this can improve clustering by preventing inflated similarity from conserved regions, ITSx can also remove or truncate sequences with non-standard ITS structures, including synthetic mock community members. **By default, ITSx is disabled to preserve full-length ITS sequences and avoid issues with mock communities.** If your dataset does not include synthetic controls and you want the benefits of ITS region extraction, use the `--run-itsx` flag to enable it.*    
+*ITSx is a program which removes the highly conserved regions flanking the ITS variable region. While this can improve clustering by preventing inflated similarity from conserved regions, ITSx can also remove or truncate sequences with non-standard ITS structures, including synthetic mock community members. **By default, ITSx is disabled to preserve full-length ITS sequences and avoid issues with mock communities.** If your dataset does not include synthetic controls and you want the benefits of ITS region extraction, use the `--run-itsx` flag to enable it.*    
 6. Manually specify cluster percentage level (`--otu-cluster-id`)
-        
-        Clustering is by default set to 97% which is the most commonly accepted species-level threshold across groups. However, if you want to be more or less conservative, you can increase or decrease the similarity threshold. The bacterial SSU gene (16S-V4) is generally more conserved, so there may an argument for raising the similarity threshold for that group.
+Clustering is by default set to 97% which is the most commonly accepted species-level threshold across groups. However, if you want to be more or less conservative, you can increase or decrease the similarity threshold. The bacterial SSU gene (16S-V4) is generally more conserved, so there may an argument for raising the similarity threshold for that group.
 7. Manually specify MUMU blast ID threshold (`--mumu-blast-id`)
-        
-        The MUMU algorithm requires a minimum similarity threshold for sequences to be merged as mother-daughter. This default is 94% for bacterial datasets, and 84% for all others. Increase the default value if you want MUMU merges to be more stringent/conservative.
+The MUMU algorithm requires a minimum similarity threshold for sequences to be merged as mother-daughter. This default is 94% for bacterial datasets, and 84% for all others. Increase the default value if you want MUMU merges to be more stringent/conservative.
 8. Manually specify MUMU minimum ratio (`--mumu-ratio`)
-        
-        The MUMU algorithm requires a minimum average ratio between parent-daughter abundances for them to be accepted as a merge. By default it is 100 for 16S and 1 for all other datasets. Increase the minimum ratio if you want MUMU merges to be more stringent/conservative.
+The MUMU algorithm requires a minimum average ratio between parent-daughter abundances for them to be accepted as a merge. By default it is 100 for 16S and 1 for all other datasets. Increase the minimum ratio if you want MUMU merges to be more stringent/conservative.
 9. Keep only forward reads (`--fwd-reads-only`)
-        
-        You can discard you reverse reads if merging is failing/discarding many of your reads due to lack of overlap or poor R2 quality. This will usually not be relevant but may be desired for 18S-V4 datasets.
+You can discard you reverse reads if merging is failing/discarding many of your reads due to lack of overlap or poor R2 quality. This will usually not be relevant but may be desired for 18S-V4 datasets.
 10. Change default wall-time (runtime) on cluster (`--slurm-time`)
-        
-        If you have a large amount of samples or really large sequence files with high read depth, OR if a previous run attempt failed because it ran of of time, you may need to extend the time on the cluster using this command. The defaults should be suitable for datasets up to 200+ samples.
+If you have a large amount of samples or really large sequence files with high read depth, OR if a previous run attempt failed because it ran of of time, you may need to extend the time on the cluster using this command. The defaults should be suitable for datasets up to 200+ samples.
 11. Change default memory allocation (`--slurm-mem`)
-        
-        f a previous job failed due to running out of memory. Up your memory allocation using this command. The default (80gb) should be suitable for most all datasets.
+If a previous job failed due to running out of memory. Up your memory allocation using this command. The default (80gb) should be suitable for most all datasets.
 
 Expect a runtime of 10 - 120 minutes. It should not go much longer than that, but the SLURM script requests 12 hours of time on the cluster just in case.
 
