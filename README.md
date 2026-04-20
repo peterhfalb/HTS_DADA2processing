@@ -279,7 +279,7 @@ Each output folder (03_dada2, 04_dada2_QCsummary, 05_asv2otu) has associated REA
 
 ## Summary of main pipeline steps:
 
-### Step 1 - Adapter and Primer trimmming
+### Step 1 - Adapter and Primer trimming
 To make sure that the reads you are processing only contain biological information, we need to make sure that adapters (used to communicate with the sequencing platform) and primers are removed from all sequences. In Illumina datasets, this is achieved by first searching and removing remaining adapters detected near the end of you forward and reverse reads using `cutadapt`, then primers are removed in a very similar fashion. In Aviti, the adapters are different (and also maybe change sometimes...), and adapter trimming has to be a little more stringent. First is an adapter trimming step using `trimmomatic`, then primers are trimmed using `cutadapt`, then adapters are search for again using `trimmomatic`. Trevor Gould says that he has found up to 4 or 5 copies of the Aviti adapters within reads, which is why this step is performed twice. He cautions however that sometimes reads can get chopped in half because primers are found deep within a read. Across both datasets, reads without primers detected are removed.
 
 ### Step 2 - DADA2 Denoising
