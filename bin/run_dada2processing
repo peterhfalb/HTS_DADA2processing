@@ -59,7 +59,7 @@ OTU_CLUSTER_ID="0.97"
 MUMU_BLAST_ID=""
 MUMU_RATIO=""
 SLURM_TIME="12:00:00"
-SLURM_MEM="60gb"
+SLURM_MEM="80gb"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -170,6 +170,11 @@ if [[ -z "$MUMU_BLAST_ID" ]]; then
 fi
 if [[ -z "$MUMU_RATIO" ]]; then
     [[ "$AMPLICON" == "16S-V4" ]] && MUMU_RATIO="100" || MUMU_RATIO="1"
+fi
+
+# Set walltime based on amplicon type (16S-V4 needs 24 hours for large datasets)
+if [[ "$AMPLICON" == "16S-V4" ]]; then
+    SLURM_TIME="24:00:00"
 fi
 
 # Validate quality
