@@ -135,7 +135,7 @@ To run the script, ssh login to the cluster and run `run_dada2processing` from a
 *Optional:*
 1. Sequence quality (`--quality`):
         Right now, the default for sequence quality is `good`, by setting to `bad`, some of the filtering parameters in DADA2 become more stringent. Reach out to Trevor Gould or the UMGC for further information as to whether you sequencing run is *good* or *bad* quality.
-2. Taxonomy database - if using something other than default (`-taxonomy-database`):
+2. Taxonomy database - if using something other than default (`--taxonomy-database`):
         Manually specify a reference database for taxonomy assignment other than default. Mostly relevant for 18S-V4 and 18S-AMF (and possibly AMF). Defaults is usually the best.
 3. Forward/Reverse Primer Sequence (`--fwd-primer/--rev-primer`):
         Use to manually input a primer sequence if either a. the pipeline detects a different primer than default or b. you used a non-canonical primer not included on the Kennedy Lab primer list.
