@@ -37,7 +37,16 @@ cd HTS_DADA2processing/
 
 # run this line of code to install and compile the pipeline package
 bash install.sh
-source ~/.bashrc
+
+# to properly initialize the command in your environment you need to log out of MSI and log back in:
+exit # exit ssh
+ssh yourEmail@agate.msi.umn.edu # log back into MSI
+
+# your pipeline should successfully be installed
+# to verify that it is installed properly check that the command has been added to your path:
+run_dada2processing --help
+# if this runs and outputs a help file, all is set up!
+
 ```
 **NOTE: It may take 10-15 minutes to install the necessary packages**
 
