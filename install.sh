@@ -240,7 +240,33 @@ echo "=========================================="
 echo "✓ SETUP COMPLETE"
 echo "=========================================="
 echo ""
+
+# ==============================================================================
+# ADD COMMAND TO PATH
+# ==============================================================================
+BIN_DIR="$PIPELINE_DIR/bin"
+BASHRC="$HOME/.bashrc"
+
+if [[ ! -d "$BIN_DIR" ]]; then
+    echo "✗ bin directory not found at $BIN_DIR"
+    exit 1
+fi
+
+echo "Adding pipeline command to PATH..."
+if grep -q "DADA2_PIPELINE_BIN" "$BASHRC"; then
+    echo "✓ PATH already configured in bashrc"
+else
+    echo "" >> "$BASHRC"
+    echo "# DADA2 Pipeline" >> "$BASHRC"
+    echo "export DADA2_PIPELINE_BIN=\"$BIN_DIR\"" >> "$BASHRC"
+    echo "export PATH=\"\$DADA2_PIPELINE_BIN:\$PATH\"" >> "$BASHRC"
+    echo "✓ Added pipeline bin directory to PATH in $BASHRC"
+fi
+
+echo ""
 echo "The environment is ready. You can now submit SLURM jobs!!!"
+echo ""
+echo "Note: If this is a new shell session, run: source ~/.bashrc"
 echo ""
 echo ""
 echo "Usage: run_dada2processing [OPTIONS]"
