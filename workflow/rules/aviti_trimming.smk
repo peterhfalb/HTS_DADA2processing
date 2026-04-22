@@ -27,7 +27,7 @@ rule aviti_trim_adapters_pass1:
         mkdir -p $(dirname {output.log})
         ADAPTER_FILE="{params.pipeline_dir}/workflow/adapters/aviti_adapters.fa"
 
-        trimmomatic PE -threads {threads} \
+        _JAVA_OPTIONS="-Xmx6g" trimmomatic PE -threads {threads} \
           {input.r1} {input.r2} \
           {output.r1} {output.r1_unpaired} \
           {output.r2} {output.r2_unpaired} \
@@ -94,7 +94,7 @@ rule aviti_trim_adapters_pass2:
         mkdir -p $(dirname {output.log})
         ADAPTER_FILE="{params.pipeline_dir}/workflow/adapters/aviti_adapters.fa"
 
-        trimmomatic PE -threads {threads} \
+        _JAVA_OPTIONS="-Xmx6g" trimmomatic PE -threads {threads} \
           {input.r1} {input.r2} \
           {output.r1} {output.r1_unpaired} \
           {output.r2} {output.r2_unpaired} \
