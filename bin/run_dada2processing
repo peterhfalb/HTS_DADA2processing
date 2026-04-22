@@ -172,8 +172,8 @@ if [[ -z "$MUMU_RATIO" ]]; then
     [[ "$AMPLICON" == "16S-V4" ]] && MUMU_RATIO="100" || MUMU_RATIO="1"
 fi
 
-# Set walltime based on amplicon type (16S-V4 needs 24 hours for large datasets)
-if [[ "$AMPLICON" == "16S-V4" ]]; then
+# Set walltime based on amplicon type and platform (16S-V4 and Aviti need 24 hours for large datasets)
+if [[ "$AMPLICON" == "16S-V4" ]] || [[ "$PLATFORM" == "aviti" ]]; then
     SLURM_TIME="24:00:00"
 fi
 
