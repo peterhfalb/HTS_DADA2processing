@@ -264,6 +264,22 @@ fi
 
 echo "Found ${#SAMPLES[@]} samples: ${SAMPLES[*]}"
 
+# Scale memory allocation by sample count: 80GB + 20GB per 100 samples (max 240GB)
+# Only calculate if not overridden by user
+if [[ "$SLURM_MEM" == "80gb" ]]; then
+    SAMPLE_COUNT=${#SAMPLES[@]}
+    EXTRA_MEM=$((SAMPLE_COUNT * 20 / 100))
+    SLURM_MEM_GB=$((80 + EXTRA_MEM))
+    # Cap at 240GB to avoid requesting more than available
+    if [[ $SLURM_MEM_GB -gt 240 ]]; then
+        SLURM_MEM_GB=240
+    fi
+    SLURM_MEM="${SLURM_MEM_GB}gb"
+    if [[ $SAMPLE_COUNT -gt 100 ]]; then
+        echo "Scaling memory for $SAMPLE_COUNT samples: $SLURM_MEM"
+    fi
+fi
+
 # Set up file paths (needed before SLURM script creation for placeholder replacement)
 CONFIG_FILE="$OUTPUT_DIR/config.yaml"
 SLURM_SCRIPT="$OUTPUT_DIR/submit_job.sh"
