@@ -174,9 +174,11 @@ fi
 
 # Set walltime based on amplicon type and platform
 if [[ "$AMPLICON" == "16S-V4" ]]; then
-    SLURM_TIME="24:00:00"
+    SLURM_TIME="48:00:00"
 elif [[ "$PLATFORM" == "aviti" ]]; then
     SLURM_TIME="48:00:00"
+elif [[ "$AMPLICON" == "18S-V4" ]]; then
+    SLURM_TIME="36:00:00"
 fi
 
 # Validate quality
