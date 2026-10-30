@@ -325,7 +325,7 @@ PIPELINE_DIR="PLACEHOLDER_PIPELINE_DIR"
 OUTPUT_DIR="PLACEHOLDER_OUTPUT_DIR"
 
 set +u  # Temporarily disable strict mode for conda/mamba
-module load miniforge/24.3
+module load miniforge  # unversioned: MSI default (versions get retired)
 module load cutadapt/5.0
 module load snakemake
 module load blast-plus/2.13.0-gcc-8.2.0-vo4mr4d 2>/dev/null || true

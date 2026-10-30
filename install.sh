@@ -100,7 +100,7 @@ echo "=========================================="
 echo ""
 
 # Load miniforge (modern conda/mamba)
-module load miniforge/24.3
+module load miniforge  # unversioned: MSI default (versions get retired)
 
 # Source conda/mamba
 CONDA_BASE=$(conda info --base 2>/dev/null) || { echo "ERROR: miniforge not found."; exit 1; }
