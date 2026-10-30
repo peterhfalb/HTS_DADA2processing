@@ -347,6 +347,14 @@ Because the MaarjAM database contains only AMF sequences, DADA2 will assign *eve
 
 Only kept OTUs go on to MaarjAM taxonomy assignment and into the final OTU table. The number and percentage of OTUs and reads kept/discarded are reported in `qc_summary.txt`. Per-OTU decisions, per-sample read retention, and a list of discarded OTUs with their SILVA taxonomy are in `05_asv2otu/04b_amf_filter/`. The discarded list is a useful way to see which off-target groups your primers picked up. These cutoffs can be changed in `config.yaml` (`amf_min_id`, `amf_min_qcov`, `amf_top_pct`, `amf_min_frac`, `amf_target_regex`). Use `--skip-amf-filter` to turn the screen off. **Note:** this screen applies to the OTU table only; the ASV table is not filtered.
 
+**Diagnosing the screen:** if the screen discards more than expected, run the diagnostic script on the finished output directory in an interactive session:
+```bash
+srun -N 1 --ntasks=8 --mem=32gb --time=1:00:00 -p interactive --pty bash
+bash /path/to/HTS_DADA2processing/bin/diagnose_amf_filter.sh /path/to/output_dir   # optional 2nd argument: number of top OTUs (default 30)
+# ROD_FASTA=/path/to/rod.fasta bash .../diagnose_amf_filter.sh /path/to/output_dir    # also compare against the Ribosomal Operon Database
+```
+It summarises OTUs, reads and sequence lengths per decision (`AMF`, `non_AMF`, `no_confident_hit`), then BLASTs the most abundant discarded OTUs against SILVA, MaarjAM and Eukaryome *without* the identity/coverage cutoffs and reports each OTU's best hit in each database. Results go to `05_asv2otu/04b_amf_filter/diagnostics/` (`diagnostics_report.txt` is the readable summary). To try different cutoffs quickly, rerun only the OTU steps with `--asv-table` (pointing at the run's `03_dada2/` ASV table) and edit the `amf_*` values in the new `config.yaml` before `sbatch`.
+
 ### Step 7 - DADA2 RDP Taxonomy Assignment
 
 After the OTUs have been created and curated, taxonomy is assigned to the centroid of each OTU using the exact same approach as above for ASV taxonomy assignment. 
