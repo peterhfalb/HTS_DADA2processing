@@ -23,6 +23,10 @@ Optional arguments:
   --rev-primer SEQUENCE     Override reverse primer for this amplicon (DNA string)
   --fwd-reads-only          Use forward reads only; skip reverse read processing (default: off)
   --skip-otu                Skip OTU clustering pipeline (default: run OTU pipeline)
+  --asv-table FILE          OTU-only mode: skip DADA2 and run only the ASV-to-OTU steps on an existing
+                            ASV table (rows = ASVs, first column = ASV sequence, then one count column
+                            per sample; taxonomy columns are ignored). --fastq-dir and --platform are
+                            not needed in this mode
   --run-itsx                Run ITSx extraction (ITS1/ITS2 only; default: off)
   --otu-cluster-id ID       VSEARCH clustering identity (default: 0.97)
   --mumu-blast-id PCT       BLAST identity % for mumu (default: 94 for 16S-V4, 84 for others)
@@ -36,6 +40,7 @@ Examples:
   run_dada2processing --amplicon 16S-V4 --fastq-dir /mnt/data/raw_fastqs --output-dir /mnt/output/16s_run --email me@umn.edu --platform illumina --project-name MyProject
   run_dada2processing --amplicon ITS2 --fastq-dir ./fastqs --output-dir ./output --email me@umn.edu --platform aviti --project-name ITS_Study --quality bad
   run_dada2processing --amplicon 16S-V4 --fastq-dir ./fastqs --output-dir ./output --email me@umn.edu --platform illumina --project-name MyProject --taxonomy-database UNITE
+  run_dada2processing --amplicon ITS2 --asv-table ./MyProject__combined_sequences_ASVtaxa_UNITE.txt --output-dir ./otu_output --email me@umn.edu --project-name MyProject
 EOF
     exit 1
 }
@@ -53,6 +58,7 @@ FWD_PRIMER_OVERRIDE=""
 REV_PRIMER_OVERRIDE=""
 FWD_READS_ONLY=0
 SKIP_OTU=0
+ASV_TABLE=""
 RUN_ITSX=0
 AMF_SILVA_FILTER=1
 OTU_CLUSTER_ID="0.97"
@@ -113,6 +119,10 @@ while [[ $# -gt 0 ]]; do
             SKIP_OTU=1
             shift 1
             ;;
+        --asv-table)
+            ASV_TABLE="$2"
+            shift 2
+            ;;
         --run-itsx)
             RUN_ITSX=1
             shift 1
@@ -152,9 +162,36 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# OTU-only mode (--asv-table): DADA2 is skipped, so fastq/platform/primer options do not apply
+OTU_ONLY=0
+if [[ -n "$ASV_TABLE" ]]; then
+    OTU_ONLY=1
+    if [[ "$SKIP_OTU" -eq 1 ]]; then
+        echo "Error: --asv-table runs only the OTU pipeline and cannot be combined with --skip-otu"
+        exit 1
+    fi
+    if [[ ! -f "$ASV_TABLE" ]]; then
+        echo "Error: ASV table does not exist: $ASV_TABLE"
+        exit 1
+    fi
+    ASV_TABLE="$(cd "$(dirname "$ASV_TABLE")" && pwd)/$(basename "$ASV_TABLE")"
+    if [[ -n "$FASTQ_DIR" || -n "$PLATFORM" || -n "$FWD_PRIMER_OVERRIDE" || -n "$REV_PRIMER_OVERRIDE" || "$FWD_READS_ONLY" -eq 1 ]]; then
+        echo "Note: --asv-table given; ignoring fastq, platform, primer and forward-only options (DADA2 is skipped)"
+    fi
+    FASTQ_DIR=""
+    PLATFORM=""
+    FWD_PRIMER_OVERRIDE=""
+    REV_PRIMER_OVERRIDE=""
+    FWD_READS_ONLY=0
+fi
+
 # Validate required arguments
-if [[ -z "$AMPLICON" || -z "$FASTQ_DIR" || -z "$OUTPUT_DIR" || -z "$EMAIL" || -z "$PLATFORM" || -z "$PROJECT_NAME" ]]; then
+if [[ -z "$AMPLICON" || -z "$OUTPUT_DIR" || -z "$EMAIL" || -z "$PROJECT_NAME" ]]; then
     echo "Error: Missing required arguments"
+    show_usage
+fi
+if [[ "$OTU_ONLY" -eq 0 && ( -z "$FASTQ_DIR" || -z "$PLATFORM" ) ]]; then
+    echo "Error: Missing required arguments (--fastq-dir and --platform are required unless --asv-table is given)"
     show_usage
 fi
 
@@ -175,7 +212,8 @@ if [[ -z "$MUMU_RATIO" ]]; then
 fi
 
 # Set walltime based on amplicon type and platform (only if not overridden by user)
-if [[ "$SLURM_TIME_USER_SET" -eq 0 ]]; then
+# OTU-only runs skip DADA2 (the long step) and keep the 12h default
+if [[ "$SLURM_TIME_USER_SET" -eq 0 && "$OTU_ONLY" -eq 0 ]]; then
     if [[ "$AMPLICON" == "16S-V4" ]]; then
         SLURM_TIME="48:00:00"
     elif [[ "$AMPLICON" == "18S-V4" ]]; then
@@ -192,7 +230,7 @@ if [[ "$QUALITY" != "good" && "$QUALITY" != "bad" ]]; then
 fi
 
 # Validate platform
-if [[ "$PLATFORM" != "illumina" && "$PLATFORM" != "aviti" ]]; then
+if [[ "$OTU_ONLY" -eq 0 && "$PLATFORM" != "illumina" && "$PLATFORM" != "aviti" ]]; then
     echo "Error: Platform must be 'illumina' or 'aviti'"
     exit 1
 fi
@@ -219,16 +257,18 @@ if [[ "$AMPLICON" == "18S-AMF" && "$AMF_SILVA_FILTER" -eq 1 && "$SKIP_OTU" -eq 0
     fi
 fi
 
-# Check fastq directory exists
-if [[ ! -d "$FASTQ_DIR" ]]; then
-    echo "Error: Fastq directory does not exist: $FASTQ_DIR"
-    exit 1
-fi
+if [[ "$OTU_ONLY" -eq 0 ]]; then
+    # Check fastq directory exists
+    if [[ ! -d "$FASTQ_DIR" ]]; then
+        echo "Error: Fastq directory does not exist: $FASTQ_DIR"
+        exit 1
+    fi
 
-# Check for fastq files
-if ! ls "$FASTQ_DIR"/*_R1_001.fastq.gz &>/dev/null; then
-    echo "Error: No fastq files found in $FASTQ_DIR (looking for *_R1_001.fastq.gz)"
-    exit 1
+    # Check for fastq files
+    if ! ls "$FASTQ_DIR"/*_R1_001.fastq.gz &>/dev/null; then
+        echo "Error: No fastq files found in $FASTQ_DIR (looking for *_R1_001.fastq.gz)"
+        exit 1
+    fi
 fi
 
 echo ""
@@ -242,13 +282,16 @@ echo ""
 echo "Setting up directories and writing SLURM script..."
 
 # Create output directory structure
-mkdir -p "$OUTPUT_DIR"/{00_raw,logs}
+mkdir -p "$OUTPUT_DIR"/logs
+[[ "$OTU_ONLY" -eq 0 ]] && mkdir -p "$OUTPUT_DIR"/00_raw
 OUTPUT_DIR=$(cd "$OUTPUT_DIR" && pwd)
 
 # Detect pipeline root directory
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 PIPELINE_DIR="$(dirname "$SCRIPT_DIR")"
 
+SAMPLES=()
+if [[ "$OTU_ONLY" -eq 0 ]]; then
 # Create 00_raw directory with symlinks
 echo "Setting up synthetic links to fastq files..."
 cd "$OUTPUT_DIR/00_raw"
@@ -266,7 +309,6 @@ done
 
 echo "Parsing fastq sample names..."
 
-SAMPLES=()
 for r1_file in *_R1_001.fastq.gz; do
     # Try removing _L001_R1_001.fastq.gz first (with lane number)
     sample_name="${r1_file%_L001_R1_001.fastq.gz}"
@@ -299,6 +341,7 @@ if [[ "$SLURM_MEM" == "80gb" ]]; then
         echo "Scaling memory for $SAMPLE_COUNT samples: $SLURM_MEM"
     fi
 fi
+fi  # end fastq setup (skipped in OTU-only mode)
 
 # Set up file paths (needed before SLURM script creation for placeholder replacement)
 CONFIG_FILE="$OUTPUT_DIR/config.yaml"
@@ -313,7 +356,7 @@ cat > "$SLURM_SCRIPT" << 'SCRIPT'
 #SBATCH --mem=PLACEHOLDER_SLURM_MEM
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=PLACEHOLDER_EMAIL
-#SBATCH --job-name=dada2_PLACEHOLDER_AMPLICON
+#SBATCH --job-name=PLACEHOLDER_JOB_NAME
 #SBATCH --output=PLACEHOLDER_OUTPUT_DIR/slurm_%j.out
 #SBATCH --error=PLACEHOLDER_OUTPUT_DIR/slurm_%j.err
 
@@ -367,7 +410,9 @@ SCRIPT
 
 # Replace placeholders in SLURM script
 sed -i.bak "s|PLACEHOLDER_EMAIL|$EMAIL|g" "$SLURM_SCRIPT"
-sed -i.bak "s|PLACEHOLDER_AMPLICON|$AMPLICON|g" "$SLURM_SCRIPT"
+JOB_NAME="dada2_${AMPLICON}"
+[[ "$OTU_ONLY" -eq 1 ]] && JOB_NAME="asv2otu_${AMPLICON}"
+sed -i.bak "s|PLACEHOLDER_JOB_NAME|$JOB_NAME|g" "$SLURM_SCRIPT"
 sed -i.bak "s|PLACEHOLDER_CONFIG|$CONFIG_FILE|g" "$SLURM_SCRIPT"
 sed -i.bak "s|PLACEHOLDER_LOG|$LOG_FILE|g" "$SLURM_SCRIPT"
 sed -i.bak "s|PLACEHOLDER_OUTPUT_DIR|$OUTPUT_DIR|g" "$SLURM_SCRIPT"
@@ -378,6 +423,7 @@ rm -f "$SLURM_SCRIPT.bak"
 
 chmod +x "$SLURM_SCRIPT"
 
+if [[ "$OTU_ONLY" -eq 0 ]]; then
 # ==============================================================================
 # PRIMER VALIDATION CHECK
 # ==============================================================================
@@ -500,6 +546,7 @@ echo "  - Nextera transposase sequences (read-through protection)"
 echo "  - i7 and i5 Illumina index adapters"
 echo "  (Cutadapt 5.0 does not support automatic adapter detection)"
 echo ""
+fi  # end primer/adapter checks (skipped in OTU-only mode)
 
 # Now write config.yaml AFTER primer and adapter detection (CONFIG_FILE defined earlier)
 cat > "$CONFIG_FILE" << YAML
@@ -523,8 +570,9 @@ otu_cluster_id: "$OTU_CLUSTER_ID"
 mumu_blast_id: "$MUMU_BLAST_ID"
 mumu_ratio: "$MUMU_RATIO"
 amf_silva_filter: "$AMF_SILVA_FILTER"
+asv_table: "$ASV_TABLE"
 
-samples:
+samples:$( [[ ${#SAMPLES[@]} -eq 0 ]] && echo " []" )
 $(for sample in "${SAMPLES[@]}"; do echo "  - $sample"; done)
 YAML
 
@@ -536,9 +584,14 @@ echo "DADA2 Pipeline Ready"
 echo "=========================================="
 echo "--SETTINGS AND SPECIFICATIONS--"
 echo "Amplicon:         $AMPLICON"
-echo "Quality:          $QUALITY"
-echo "Platform:         $PLATFORM"
-echo "Samples:          ${#SAMPLES[@]}"
+if [[ "$OTU_ONLY" -eq 1 ]]; then
+    echo "Mode:             OTU-only (DADA2 skipped)"
+    echo "ASV table:        $ASV_TABLE"
+else
+    echo "Quality:          $QUALITY"
+    echo "Platform:         $PLATFORM"
+    echo "Samples:          ${#SAMPLES[@]}"
+fi
 echo "Project name:     $PROJECT_NAME"
 # Display taxonomy database
 if [[ -n "$TAXONOMY_DB_OVERRIDE" ]]; then
@@ -552,15 +605,17 @@ else
     esac
 fi
 echo ""
-echo "--PRIMERS--"
-# Resolve and display primers (defaults come from primers.json; may include auto-detected values)
-DISPLAY_FWD="${FWD_PRIMER_OVERRIDE:-$DEFAULT_FWD}"
-DISPLAY_REV="${REV_PRIMER_OVERRIDE:-$DEFAULT_REV}"
+if [[ "$OTU_ONLY" -eq 0 ]]; then
+    echo "--PRIMERS--"
+    # Resolve and display primers (defaults come from primers.json; may include auto-detected values)
+    DISPLAY_FWD="${FWD_PRIMER_OVERRIDE:-$DEFAULT_FWD}"
+    DISPLAY_REV="${REV_PRIMER_OVERRIDE:-$DEFAULT_REV}"
 
-echo "Fwd primer:       $DISPLAY_FWD"
-echo "Rev primer:       $DISPLAY_REV"
-echo "Forward-only:     $([ "$FWD_READS_ONLY" -eq 1 ] && echo 'yes' || echo 'no')"
-echo ""
+    echo "Fwd primer:       $DISPLAY_FWD"
+    echo "Rev primer:       $DISPLAY_REV"
+    echo "Forward-only:     $([ "$FWD_READS_ONLY" -eq 1 ] && echo 'yes' || echo 'no')"
+    echo ""
+fi
 
 if [ "$SKIP_OTU" -eq 0 ]; then
     echo "--ASV2OTU SETTINGS--"
@@ -580,7 +635,11 @@ echo "Walltime:         $SLURM_TIME"
 echo "Memory:           $SLURM_MEM"
 echo ""
 echo "--FILES AND DIRECTORIES--"
-echo "Input directory:  $FASTQ_DIR"
+if [[ "$OTU_ONLY" -eq 1 ]]; then
+    echo "Input ASV table:  $ASV_TABLE"
+else
+    echo "Input directory:  $FASTQ_DIR"
+fi
 echo "Output directory: $OUTPUT_DIR"
 echo "Config file:      $CONFIG_FILE"
 echo "SLURM script:     $SLURM_SCRIPT"

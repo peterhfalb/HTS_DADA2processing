@@ -14,12 +14,12 @@ from datetime import datetime
 configfile: "config.yaml"
 
 AMPLICON = config["amplicon"]
-QUALITY = config["quality"]
-PLATFORM = config["platform"]
+QUALITY = config.get("quality", "good")
+PLATFORM = config.get("platform", "")
 OUTPUT_DIR = config["output_dir"]
-SAMPLES = config["samples"]
+SAMPLES = config.get("samples") or []
 EMAIL = config["email"]
-FASTQ_DIR = config["fastq_dir"]
+FASTQ_DIR = config.get("fastq_dir", "")
 PROJECT_NAME = config["project_name"]
 TAXONOMY_DB_OVERRIDE = config.get("taxonomy_db_override", "")
 FWD_PRIMER_OVERRIDE = config.get("fwd_primer_override", "")
@@ -30,6 +30,9 @@ FWD_READS_ONLY  = str(config.get("fwd_reads_only", "0")) == "1"
 
 # OTU pipeline configuration (handle both string and int YAML inputs)
 SKIP_OTU        = str(config.get("skip_otu", "0")) == "1"
+# OTU-only mode: run just the ASV-to-OTU steps on an existing ASV table (DADA2 skipped)
+ASV_TABLE       = config.get("asv_table", "") or ""
+OTU_ONLY        = bool(ASV_TABLE)
 RUN_ITSX        = str(config.get("run_itsx", "0")) == "1"
 OTU_CLUSTER_ID  = config.get("otu_cluster_id", "0.97")
 MUMU_BLAST_ID   = config.get("mumu_blast_id", "84")
@@ -86,6 +89,9 @@ else:
     EFFECTIVE_TAXONOMY_DB = TAXONOMY_DB_PATHS[db_name_key]
     DB_NAME = db_name_key
 
+# ASV table feeding the OTU pipeline: the supplied table in OTU-only mode, else DADA2's output
+ASV_INPUT_TABLE = ASV_TABLE if OTU_ONLY else OUTPUT_DIR + f"/03_dada2/{PROJECT_NAME}__combined_sequences_ASVtaxa_{DB_NAME}.txt"
+
 # Resolve effective primers
 EFFECTIVE_FWD = FWD_PRIMER_OVERRIDE if FWD_PRIMER_OVERRIDE else PRIMERS[AMPLICON]["fwd"]
 EFFECTIVE_REV = REV_PRIMER_OVERRIDE if REV_PRIMER_OVERRIDE else PRIMERS[AMPLICON]["rev"]
@@ -136,6 +142,26 @@ def get_input_r2(wildcards):
 # Rules
 # ============================================================================
 
+# Final target (first rule = default target)
+if OTU_ONLY:
+    rule all:
+        """Final target (OTU-only mode): ASV-to-OTU outputs from the supplied ASV table"""
+        input:
+            OUTPUT_DIR + f"/05_asv2otu/{PROJECT_NAME}__OTUs_with_taxonomy_{DB_NAME}.txt",
+            OUTPUT_DIR + "/05_asv2otu/otu_qc_summary.txt",
+            OUTPUT_DIR + "/05_asv2otu/README.txt",
+            OUTPUT_DIR + "/05_asv2otu/01_input/README.txt",
+            OUTPUT_DIR + "/05_asv2otu/03_vsearch/README.txt",
+            OUTPUT_DIR + "/05_asv2otu/04_mumu/README.txt",
+            OUTPUT_DIR + "/05_asv2otu/05_taxonomy/README.txt",
+            *([OUTPUT_DIR + "/05_asv2otu/02_itsx/README.txt"] if (RUN_ITSX and AMPLICON in ("ITS1", "ITS2")) else []),
+            *([OUTPUT_DIR + "/05_asv2otu/04b_amf_filter/README.txt"] if AMF_FILTER else []),
+else:
+    rule all:
+        """Final target: DADA2 + OTU processing complete"""
+        input:
+            OUTPUT_DIR + "/.cleanup.done"
+
 rule cleanup_temp_files:
     """Remove temporary FASTQ files created during processing"""
     input:
@@ -159,11 +185,6 @@ rule cleanup_temp_files:
         echo "Temporary file cleanup complete"
         touch {output.touch_file}
         """
-
-rule all:
-    """Final target: DADA2 + OTU processing complete"""
-    input:
-        OUTPUT_DIR + "/.cleanup.done"
 
 # Include trimming rules based on platform
 if PLATFORM == "aviti":

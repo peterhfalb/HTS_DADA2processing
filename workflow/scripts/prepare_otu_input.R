@@ -47,6 +47,16 @@ names(asvT)[1] <- "ASV"
 
 cat("Columns retained (ASV + sample counts): ", ncol(asvT), "\n")
 
+# Check format (matters for user-supplied tables in OTU-only mode)
+if (!all(grepl("^[ACGTRYSWKMBDHVN]+$", toupper(asvT$ASV)))) {
+  stop("First column of the ASV table must contain ASV DNA sequences (one ASV per row)")
+}
+non_numeric <- names(asvT)[-1][!vapply(asvT[-1], is.numeric, logical(1))]
+if (length(non_numeric) > 0) {
+  stop("Non-numeric columns in the ASV table (expected only sample count columns besides ",
+       "the sequence and taxonomy columns): ", paste(non_numeric, collapse = ", "))
+}
+
 n_samples <- ncol(asvT)  # includes ASV column
 
 # Add total reads and sort descending

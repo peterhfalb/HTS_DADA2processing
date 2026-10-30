@@ -50,6 +50,12 @@ samples:
 # Default: 0 (run full pipeline). Set to 1 to skip OTU pipeline.
 # skip_otu: "0"
 
+# OTU-only mode: run only the ASV-to-OTU steps on an existing ASV table (DADA2 is skipped).
+# Path to a tab-separated table: rows = ASVs, first column = ASV sequence, then one count
+# column per sample (taxonomy columns are ignored). Set by run_dada2processing --asv-table.
+# Default: "" (off; the DADA2 ASV table is used)
+# asv_table: ""
+
 # Run ITSx extraction to trim conserved flanking regions and drop non-ITS sequences (ITS1/ITS2 only)
 # Default: 0 (off, preserves full-length ITS and synthetic mock community members). Set to 1 to enable.
 # run_itsx: "0"

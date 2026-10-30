@@ -26,7 +26,7 @@ def get_curated_otu_table(wildcards):
 rule prepare_otu_input:
     """Convert ASV table to FASTA and abundance table for OTU clustering"""
     input:
-        asv_table=OUTPUT_DIR + f"/03_dada2/{PROJECT_NAME}__combined_sequences_ASVtaxa_{DB_NAME}.txt",
+        asv_table=ASV_INPUT_TABLE,
     output:
         fasta=OUTPUT_DIR + "/05_asv2otu/01_input/Centroid.fasta",
         abund=OUTPUT_DIR + "/05_asv2otu/01_input/asv_abundance_table.txt",
@@ -413,7 +413,7 @@ rule combine_otu_taxonomy:
 rule generate_otu_qc_summary:
     """Generate comprehensive OTU QC summary from all pipeline steps"""
     input:
-        asv_table=OUTPUT_DIR + f"/03_dada2/{PROJECT_NAME}__combined_sequences_ASVtaxa_{DB_NAME}.txt",
+        asv_table=ASV_INPUT_TABLE,
         centroids=OUTPUT_DIR + f"/05_asv2otu/03_vsearch/{PROJECT_NAME}.centroids",
         mumu_table=OUTPUT_DIR + f"/05_asv2otu/04_mumu/{PROJECT_NAME}_mumu_curated.txt",
         curated_table=get_curated_otu_table,
@@ -454,7 +454,8 @@ rule asv2otu_input_readme:
 # ASV to OTU Pipeline - Step 1: Input Preparation
 ## Directory: 05_asv2otu/01_input/
 
-This directory contains the prepared input files for OTU clustering, derived from the DADA2 ASV table.
+This directory contains the prepared input files for OTU clustering, derived from the ASV table
+(the DADA2 output, or the table supplied with --asv-table in OTU-only mode).
 
 ### Contents:
 

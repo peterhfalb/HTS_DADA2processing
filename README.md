@@ -172,6 +172,8 @@ To run the script, ssh login to the cluster and run `run_dada2processing` from a
         By default, 18S-AMF OTUs are BLASTed against SILVA and only OTUs that match AMF (Glomeromycotina) are kept before MaarjAM taxonomy assignment (see Step 6b). Use this flag to turn that off and keep all OTUs.
 12. Change default memory allocation (`--slurm-mem`):
         If a previous job failed due to running out of memory. Up your memory allocation using this command. By default the pipeline requests 80gb plus 20gb for every 100 samples (capped at 240gb), which should be suitable for most all datasets.
+13. OTU an existing ASV table only (`--asv-table`):
+        Skips adapter/primer trimming and DADA2 entirely, and runs only the ASV-to-OTU steps (ITSx if requested, VSEARCH, mumu, the AMF SILVA screen for 18S-AMF, and OTU taxonomy) on an ASV table you already have. Useful for re-OTUing an earlier run with different clustering/mumu settings, or for OTUing an ASV table from elsewhere. The table must be tab-separated, with one ASV per row: the first column holds the ASV sequence and the remaining columns hold read counts per sample. Taxonomy and bootstrap columns (Kingdom, Phylum, ... and `*_bootstrap`) are ignored, so the pipeline's own `ProjectName__combined_sequences_ASVtaxa_DatabaseName.txt` works as-is. `--fastq-dir` and `--platform` are not needed, and primer checks are skipped. `--amplicon` is still required (it sets the taxonomy database and mumu defaults). Outputs go to `05_asv2otu/` in the output directory, and the default walltime is 12 hours.
 
 Expect a runtime of 1 - 12 hours for most Illumina datasets. Larger datasets (16S-V4, 18S-V4) and Aviti runs take longer, which is why the SLURM script requests more time for them by default (see above) just in case.
 
@@ -198,6 +200,10 @@ run_dada2processing [OPTIONS]
 #  --rev-primer SEQUENCE     Override reverse primer for this amplicon (DNA string)
 #  --fwd-reads-only          Use forward reads only; skip reverse read processing (default: off)
 #  --skip-otu                Skip OTU clustering pipeline (default: run OTU pipeline)
+#  --asv-table FILE          OTU-only mode: skip DADA2 and run only the ASV-to-OTU steps on an existing
+#                            ASV table (rows = ASVs, first column = ASV sequence, then one count column
+#                            per sample; taxonomy columns are ignored). --fastq-dir and --platform are
+#                            not needed in this mode
 #  --run-itsx                Run ITSx extraction (ITS1/ITS2 only; default: off)
 #  --otu-cluster-id ID       VSEARCH clustering identity (default: 0.97)
 #  --mumu-blast-id PCT       BLAST identity % for mumu (default: 94 for 16S-V4, 84 for others)
@@ -212,6 +218,7 @@ run_dada2processing [OPTIONS]
 #  run_dada2processing --amplicon ITS2 --fastq-dir /path/to/raw_fastqs --output-dir /path/to/output --email me@umn.edu --platform aviti --project-name ITS_Study --quality bad
 #  run_dada2processing --amplicon 18S-V4 --fastq-dir /path/to/raw_fastqs --output-dir /path/to/output --email me@umn.edu --platform illumina --project-name MyProject --taxonomy-database EukaryomeSSU
 #  run_dada2processing --amplicon ITS2 --fastq-dir /path/to/raw_fastqs --output-dir /path/to/output --email me@umn.edu --platform illumina --project-name MyProject --fwd-primer GTGARTCATCGAATCTTTG
+#  run_dada2processing --amplicon ITS2 --asv-table /path/to/MyProject__combined_sequences_ASVtaxa_UNITE.txt --output-dir /path/to/otu_output --email me@umn.edu --project-name MyProject
 ```
 
 After you run the command, the pipeline will do some pre-submission checks, generate a config file with all your presets, and then validate that the primers you chose (default unless otherwise specified) are actually present in your forward and reverse reads. If it detects them in high abundance it will tell you all is good! If not, it will show you what was detected, and either automatically select another primer (if it found it at high enough abundance), or recommend that you review your files and primer choices and manually specify a different primer.
