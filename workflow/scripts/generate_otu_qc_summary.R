@@ -2,11 +2,11 @@
 # generate_otu_qc_summary.R
 # Generates comprehensive OTU QC summary by reading intermediate files from each step
 #
-# Usage: Rscript generate_otu_qc_summary.R <output_dir> <project_name> <run_itsx> [<cluster_id>]
+# Usage: Rscript generate_otu_qc_summary.R <output_dir> <project_name> <run_itsx> [<cluster_id>] [<amf_filter>]
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 3) {
-  stop("Usage: Rscript generate_otu_qc_summary.R <output_dir> <project_name> <run_itsx> [<cluster_id>]")
+  stop("Usage: Rscript generate_otu_qc_summary.R <output_dir> <project_name> <run_itsx> [<cluster_id>] [<amf_filter>]")
 }
 
 OUTPUT_DIR  <- args[1]
@@ -15,12 +15,15 @@ PROJECT     <- args[2]
 RUN_ITSX    <- tolower(args[3]) %in% c("1", "true", "yes")
 # VSEARCH clustering identity, used only for labelling the summary
 CLUSTER_ID  <- if (length(args) >= 4) args[4] else "0.97"
+# AMF SILVA screen (18S-AMF only)
+AMF_FILTER  <- length(args) >= 5 && tolower(args[5]) %in% c("1", "true", "yes")
 
 cat("Generating OTU QC Summary...\n")
 cat("Output dir: ", OUTPUT_DIR, "\n")
 cat("Project:    ", PROJECT, "\n")
 cat("Run ITSx:   ", RUN_ITSX, "\n")
-cat("Cluster ID: ", CLUSTER_ID, "\n\n")
+cat("Cluster ID: ", CLUSTER_ID, "\n")
+cat("AMF filter: ", AMF_FILTER, "\n\n")
 
 # ============================================================================
 # Collect counts from each step
@@ -119,6 +122,25 @@ if (!is.na(otus_pre_mumu) && !is.na(otus_post_mumu)) {
   cat("OTUs removed by mumu: ", otus_removed_mumu, " (", pct_removed_mumu, "%)\n")
 }
 
+# 6b. AMF SILVA screen (18S-AMF only)
+amf_counts <- list()
+if (AMF_FILTER) {
+  amf_counts_file <- file.path(otu_dir, "04b_amf_filter", "amf_filter_counts.txt")
+  if (file.exists(amf_counts_file)) {
+    for (line in readLines(amf_counts_file)) {
+      parts <- strsplit(line, "=")[[1]]
+      if (length(parts) == 2) amf_counts[[trimws(parts[1])]] <- trimws(parts[2])
+    }
+    cat("OTUs passing AMF SILVA filter: ", amf_counts$AMF_KEPT_OTUS, "\n")
+    cat("% reads retained by AMF filter: ", amf_counts$AMF_PCT_READS_RETAINED, "%\n")
+  } else {
+    cat("Warning: AMF filter counts file not found\n")
+  }
+}
+
+# OTUs entering taxonomy assignment (post-mumu, or post-AMF filter if run)
+otus_pre_tax <- if (!is.null(amf_counts$AMF_KEPT_OTUS)) as.numeric(amf_counts$AMF_KEPT_OTUS) else otus_post_mumu
+
 # 7. After taxonomy assignment
 tax_dir <- file.path(otu_dir, "05_taxonomy")
 tax_files <- list.files(tax_dir, pattern = "_combined.txt$")
@@ -129,8 +151,8 @@ pct_with_tax <- NA
 if (!is.na(tax_file) && file.exists(tax_file)) {
   otus_with_tax <- system(paste("tail -n +2", tax_file, "| wc -l"), intern = TRUE)
   otus_with_tax <- as.numeric(otus_with_tax)
-  if (!is.na(otus_post_mumu)) {
-    pct_with_tax <- round((otus_with_tax / otus_post_mumu) * 100, 1)
+  if (!is.na(otus_pre_tax)) {
+    pct_with_tax <- round((otus_with_tax / otus_pre_tax) * 100, 1)
     cat("OTUs with taxonomy: ", otus_with_tax, " (", pct_with_tax, "%)\n")
   } else {
     cat("OTUs with taxonomy: ", otus_with_tax, "\n")
@@ -187,6 +209,16 @@ if (!is.na(pct_removed_mumu)) {
 
 if (!is.na(otus_post_mumu)) {
   summary_lines <- c(summary_lines, paste("Final OTU count (post-mumu)", otus_post_mumu, sep = "\t"))
+}
+
+if (length(amf_counts) > 0) {
+  summary_lines <- c(summary_lines,
+    paste("OTUs passing AMF SILVA filter", amf_counts$AMF_KEPT_OTUS, sep = "\t"),
+    paste("OTUs discarded by AMF filter: non-AMF", amf_counts$AMF_DISCARDED_NON_AMF, sep = "\t"),
+    paste("OTUs discarded by AMF filter: no confident hit", amf_counts$AMF_DISCARDED_NO_HIT, sep = "\t"),
+    paste("% OTUs discarded by AMF filter", paste0(amf_counts$AMF_PCT_OTUS_DISCARDED, "%"), sep = "\t"),
+    paste("% reads retained by AMF filter", paste0(amf_counts$AMF_PCT_READS_RETAINED, "%"), sep = "\t")
+  )
 }
 
 if (!is.na(otus_with_tax)) {

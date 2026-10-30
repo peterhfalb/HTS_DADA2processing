@@ -8,6 +8,17 @@ def get_vsearch_input(wildcards):
         return OUTPUT_DIR + f"/05_asv2otu/02_itsx/Centroid.ITSx.{AMPLICON}.filtered.fasta"
     return OUTPUT_DIR + "/05_asv2otu/01_input/Centroid.fasta"
 
+# Helper functions to choose OTU fasta/table after curation (AMF SILVA filter conditional)
+def get_taxonomy_input_fasta(wildcards):
+    if AMF_FILTER:
+        return OUTPUT_DIR + "/05_asv2otu/04b_amf_filter/Centroid_AMF_filtered.fas"
+    return OUTPUT_DIR + "/05_asv2otu/04_mumu/Centroid_mumu_curated.fas"
+
+def get_curated_otu_table(wildcards):
+    if AMF_FILTER:
+        return OUTPUT_DIR + f"/05_asv2otu/04b_amf_filter/{PROJECT_NAME}_AMF_filtered.txt"
+    return OUTPUT_DIR + f"/05_asv2otu/04_mumu/{PROJECT_NAME}_mumu_curated.txt"
+
 # ============================================================================
 # Step 1: Prepare OTU input from ASV table
 # ============================================================================
@@ -260,13 +271,84 @@ rule mumu_curation:
         """
 
 # ============================================================================
+# Step 4b: AMF SILVA screen (18S-AMF only, on by default)
+# ============================================================================
+
+# Only define amf_silva_filter rule for 18S-AMF with the filter enabled
+if AMF_FILTER:
+    rule amf_silva_filter:
+        """BLAST curated OTU centroids against SILVA; keep OTUs whose near-top hits are mostly AMF"""
+        input:
+            fasta=OUTPUT_DIR + "/05_asv2otu/04_mumu/Centroid_mumu_curated.fas",
+            otutable=OUTPUT_DIR + f"/05_asv2otu/04_mumu/{PROJECT_NAME}_mumu_curated.txt",
+            map_file=OUTPUT_DIR + "/05_asv2otu/01_input/Map_file.csv",
+        output:
+            fasta=OUTPUT_DIR + "/05_asv2otu/04b_amf_filter/Centroid_AMF_filtered.fas",
+            otutable=OUTPUT_DIR + f"/05_asv2otu/04b_amf_filter/{PROJECT_NAME}_AMF_filtered.txt",
+            decisions=OUTPUT_DIR + "/05_asv2otu/04b_amf_filter/amf_filter_otu_decisions.tsv",
+            discarded=OUTPUT_DIR + "/05_asv2otu/04b_amf_filter/amf_filter_discarded.tsv",
+            per_sample=OUTPUT_DIR + "/05_asv2otu/04b_amf_filter/amf_filter_per_sample.tsv",
+            counts=OUTPUT_DIR + "/05_asv2otu/04b_amf_filter/amf_filter_counts.txt",
+        params:
+            outdir=OUTPUT_DIR + "/05_asv2otu/04b_amf_filter",
+            project=PROJECT_NAME,
+            blast_db=SILVA_BLAST_DB,
+            min_id=AMF_MIN_ID,
+            min_qcov=AMF_MIN_QCOV,
+            top_pct=AMF_TOP_PCT,
+            min_frac=AMF_MIN_FRAC,
+            target_regex=AMF_TARGET_REGEX,
+            pipeline_dir=workflow.basedir,
+        threads: workflow.cores
+        log:
+            OUTPUT_DIR + "/.logs/amf_silva_filter.log",
+        shell:
+            """
+            mkdir -p {params.outdir}
+
+            # Verify SILVA BLAST database exists
+            if [[ ! -f "{params.blast_db}.nsq" && ! -f "{params.blast_db}.nal" ]]; then
+                echo "ERROR: SILVA BLAST database not found at {params.blast_db}" | tee {log}
+                echo "Build it once with: bash {params.pipeline_dir}/bin/setup_silva_blastdb.sh" | tee -a {log}
+                exit 1
+            fi
+
+            # BLAST against SILVA (hits restricted to identity and query coverage cutoffs)
+            blastn -query {input.fasta} \
+                -db {params.blast_db} \
+                -outfmt '6 qseqid sseqid pident length qcovhsp bitscore evalue stitle' \
+                -max_target_seqs 100 \
+                -max_hsps 1 \
+                -perc_identity {params.min_id} \
+                -qcov_hsp_perc {params.min_qcov} \
+                -num_threads {threads} \
+                -out {params.outdir}/silva_blast_hits.tsv 2>&1 | tee {log}
+
+            # Decide keep/discard per OTU and write filtered fasta/table and QC records
+            Rscript {params.pipeline_dir}/workflow/scripts/amf_silva_filter.R \
+                {params.outdir}/silva_blast_hits.tsv \
+                {input.fasta} \
+                {input.otutable} \
+                {input.map_file} \
+                {params.outdir} \
+                {params.project} \
+                {params.top_pct} \
+                {params.min_frac} \
+                '{params.target_regex}' \
+                2>&1 | tee -a {log}
+
+            # Compress raw BLAST hits (kept for inspection)
+            gzip -f {params.outdir}/silva_blast_hits.tsv
+            """
+
+# ============================================================================
 # Step 5: Assign OTU taxonomy
 # ============================================================================
 
 rule assign_otu_taxonomy:
     """DADA2 RDP taxonomy assignment for OTU centroids"""
     input:
-        fasta=OUTPUT_DIR + f"/05_asv2otu/04_mumu/Centroid_mumu_curated.fas",
+        fasta=get_taxonomy_input_fasta,
     output:
         taxonomy=OUTPUT_DIR + f"/05_asv2otu/05_taxonomy/Taxonomy_rdp_{AMPLICON}_combined.txt",
     params:
@@ -298,7 +380,7 @@ rule assign_otu_taxonomy:
 rule combine_otu_taxonomy:
     """Merge OTU abundances with taxonomy assignments"""
     input:
-        otu_table=OUTPUT_DIR + f"/05_asv2otu/04_mumu/{PROJECT_NAME}_mumu_curated.txt",
+        otu_table=get_curated_otu_table,
         taxonomy=OUTPUT_DIR + f"/05_asv2otu/05_taxonomy/Taxonomy_rdp_{AMPLICON}_combined.txt",
         map_file=OUTPUT_DIR + "/05_asv2otu/01_input/Map_file.csv",
     output:
@@ -334,6 +416,7 @@ rule generate_otu_qc_summary:
         asv_table=OUTPUT_DIR + f"/03_dada2/{PROJECT_NAME}__combined_sequences_ASVtaxa_{DB_NAME}.txt",
         centroids=OUTPUT_DIR + f"/05_asv2otu/03_vsearch/{PROJECT_NAME}.centroids",
         mumu_table=OUTPUT_DIR + f"/05_asv2otu/04_mumu/{PROJECT_NAME}_mumu_curated.txt",
+        curated_table=get_curated_otu_table,
         taxonomy=OUTPUT_DIR + f"/05_asv2otu/05_taxonomy/Taxonomy_rdp_{AMPLICON}_combined.txt",
     output:
         qc_summary=OUTPUT_DIR + "/05_asv2otu/otu_qc_summary.txt",
@@ -342,6 +425,7 @@ rule generate_otu_qc_summary:
         project=PROJECT_NAME,
         run_itsx="1" if (RUN_ITSX and AMPLICON in ("ITS1", "ITS2")) else "0",
         cluster_id=OTU_CLUSTER_ID,
+        amf_filter="1" if AMF_FILTER else "0",
         pipeline_dir=workflow.basedir,
     log:
         OUTPUT_DIR + "/.logs/generate_otu_qc_summary.log",
@@ -352,6 +436,7 @@ rule generate_otu_qc_summary:
             {params.project} \
             {params.run_itsx} \
             {params.cluster_id} \
+            {params.amf_filter} \
             2>&1 | tee {log}
         """
 
@@ -491,6 +576,56 @@ Curated OTU sequences proceed to RDP taxonomy assignment.
 EOF
         """
 
+rule asv2otu_amf_filter_readme:
+    """Create README for AMF SILVA screen step (18S-AMF only)"""
+    output:
+        OUTPUT_DIR + "/05_asv2otu/04b_amf_filter/README.txt",
+    params:
+        project_name=PROJECT_NAME,
+        min_id=AMF_MIN_ID,
+        min_qcov=AMF_MIN_QCOV,
+        top_pct=AMF_TOP_PCT,
+        min_frac=AMF_MIN_FRAC,
+        target_regex=AMF_TARGET_REGEX,
+        blast_db=SILVA_BLAST_DB,
+    shell:
+        """
+        cat > {output} << 'EOF'
+# ASV to OTU Pipeline - Step 4b: AMF SILVA Screen (18S-AMF only)
+## Directory: 05_asv2otu/04b_amf_filter/
+
+MaarjAM contains only AMF sequences, so DADA2 assigns every sequence to Glomeromycota.
+This step BLASTs the mumu-curated OTU centroids against the full SILVA SSU Ref NR99
+database (which also contains plants, other fungi, protists and prokaryotes) and keeps
+only OTUs whose best SILVA matches are AMF. Only kept OTUs go on to MaarjAM taxonomy.
+
+### Contents:
+- `Centroid_AMF_filtered.fas`: Centroid sequences of kept OTUs (with ;size= annotations)
+- `{params.project_name}_AMF_filtered.txt`: OTU abundance table with only kept OTUs
+- `amf_filter_otu_decisions.tsv`: Every OTU with its decision, reason, total reads,
+  fraction of near-top hits that are AMF, and best SILVA hit (identity, coverage, taxonomy)
+- `amf_filter_discarded.tsv`: Discarded OTUs only, with their best SILVA taxonomy
+  (useful to see what off-target groups were amplified)
+- `amf_filter_per_sample.tsv`: Reads kept / total per sample
+- `amf_filter_counts.txt`: Summary counts (also reported in otu_qc_summary.txt)
+- `silva_blast_hits.tsv.gz`: Raw BLAST hits
+
+### Decision logic:
+1. BLAST (megablast) against SILVA, up to 100 hits per OTU, keeping only hits with
+   >= {params.min_id}% identity and >= {params.min_qcov}% query coverage
+2. Near-top hits = hits with bitscore within {params.top_pct}% of the OTU's best bitscore
+3. AMF fraction = share of near-top hits whose SILVA taxonomy matches '{params.target_regex}'
+4. Keep if AMF fraction >= {params.min_frac}; otherwise discard as `non_AMF`
+5. OTUs with no hit passing the identity/coverage cutoffs are discarded as `no_confident_hit`
+
+### Database:
+{params.blast_db}
+
+### Next Step:
+Kept OTU sequences proceed to MaarjAM RDP taxonomy assignment.
+EOF
+        """
+
 rule asv2otu_taxonomy_readme:
     """Create README for taxonomy assignment step"""
     output:
@@ -556,6 +691,12 @@ This directory contains the complete ASV-to-OTU clustering and curation workflow
 - Merges low-abundance into high-abundance OTUs
 - Outputs: Curated OTU abundance table and representative sequences
 
+**Step 4b: AMF SILVA Screen** (04b_amf_filter/)
+- *18S-AMF only (on by default; disable with --skip-amf-filter)*
+- BLASTs curated OTUs against SILVA SSU Ref NR99
+- Keeps only OTUs whose near-top SILVA hits are mostly Glomeromycotina (AMF)
+- Outputs: Filtered OTU table and sequences, per-OTU decisions, discarded OTUs
+
 **Step 5: Taxonomy Assignment** (05_taxonomy/)
 - RDP-based taxonomy assignment for OTU centroids
 - Bootstrap confidence values for each taxonomic rank
@@ -613,6 +754,7 @@ rule finalize_outputs:
         **{f"readme_itsx": OUTPUT_DIR + "/05_asv2otu/02_itsx/README.txt"} if (not SKIP_OTU and RUN_ITSX and AMPLICON in ("ITS1", "ITS2")) else {},
         **{f"readme_vsearch": OUTPUT_DIR + "/05_asv2otu/03_vsearch/README.txt"} if not SKIP_OTU else {},
         **{f"readme_mumu": OUTPUT_DIR + "/05_asv2otu/04_mumu/README.txt"} if not SKIP_OTU else {},
+        **{f"readme_amf_filter": OUTPUT_DIR + "/05_asv2otu/04b_amf_filter/README.txt"} if (not SKIP_OTU and AMF_FILTER) else {},
         **{f"readme_taxonomy": OUTPUT_DIR + "/05_asv2otu/05_taxonomy/README.txt"} if not SKIP_OTU else {},
         **{f"readme_overview": OUTPUT_DIR + "/05_asv2otu/README.txt"} if not SKIP_OTU else {},
         **{f"otu_table": OUTPUT_DIR + f"/05_asv2otu/{PROJECT_NAME}__OTUs_with_taxonomy_{DB_NAME}.txt"} if not SKIP_OTU else {},

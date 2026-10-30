@@ -27,6 +27,7 @@ Optional arguments:
   --otu-cluster-id ID       VSEARCH clustering identity (default: 0.97)
   --mumu-blast-id PCT       BLAST identity % for mumu (default: 94 for 16S-V4, 84 for others)
   --mumu-ratio RATIO        mumu minimum_ratio (default: 100 for 16S-V4, 1 for others)
+  --skip-amf-filter         18S-AMF only: skip the SILVA BLAST screen that keeps only Glomeromycotina OTUs (default: run it)
   --slurm-time TIME         SLURM walltime (HH:MM:SS, default: 12:00:00; 36:00:00 for 18S-V4; 48:00:00 for 16S-V4 and Aviti)
   --slurm-mem MEM           SLURM memory allocation (default: 80gb + 20gb per 100 samples, max 240gb)
   --help                    Show this help message
@@ -53,6 +54,7 @@ REV_PRIMER_OVERRIDE=""
 FWD_READS_ONLY=0
 SKIP_OTU=0
 RUN_ITSX=0
+AMF_SILVA_FILTER=1
 OTU_CLUSTER_ID="0.97"
 MUMU_BLAST_ID=""
 MUMU_RATIO=""
@@ -113,6 +115,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --run-itsx)
             RUN_ITSX=1
+            shift 1
+            ;;
+        --skip-amf-filter)
+            AMF_SILVA_FILTER=0
             shift 1
             ;;
         --otu-cluster-id)
@@ -197,6 +203,18 @@ if [[ -n "$TAXONOMY_DB_OVERRIDE" ]]; then
     if [[ ! " ${valid_dbs[@]} " =~ " ${TAXONOMY_DB_OVERRIDE} " ]]; then
         echo "Error: Invalid taxonomy database '${TAXONOMY_DB_OVERRIDE}'"
         echo "Valid options: ${valid_dbs[*]}"
+        exit 1
+    fi
+fi
+
+# Check SILVA BLAST database for the 18S-AMF SILVA screen
+# (keep path in sync with SILVA_BLAST_DB in the Snakefile)
+SILVA_BLAST_DB="/projects/standard/kennedyp/shared/taxonomy/silva_138.2_NR99_blastdb/SILVA_138.2_NR99"
+if [[ "$AMPLICON" == "18S-AMF" && "$AMF_SILVA_FILTER" -eq 1 && "$SKIP_OTU" -eq 0 ]]; then
+    if [[ ! -f "${SILVA_BLAST_DB}.nsq" && ! -f "${SILVA_BLAST_DB}.nal" ]]; then
+        echo "Error: SILVA BLAST database for the AMF screen not found at: $SILVA_BLAST_DB"
+        echo "Build it once with:  bash $(dirname "$(readlink -f "$0")")/setup_silva_blastdb.sh"
+        echo "Or rerun with --skip-amf-filter to skip the AMF SILVA screen."
         exit 1
     fi
 fi
@@ -504,6 +522,7 @@ run_itsx: "$RUN_ITSX"
 otu_cluster_id: "$OTU_CLUSTER_ID"
 mumu_blast_id: "$MUMU_BLAST_ID"
 mumu_ratio: "$MUMU_RATIO"
+amf_silva_filter: "$AMF_SILVA_FILTER"
 
 samples:
 $(for sample in "${SAMPLES[@]}"; do echo "  - $sample"; done)
@@ -549,6 +568,9 @@ if [ "$SKIP_OTU" -eq 0 ]; then
     echo "ITSx extraction:  $([ "$RUN_ITSX" -eq 1 ] && echo 'enabled' || echo 'disabled')"
     echo "mumu BLAST ID:    ${MUMU_BLAST_ID}%"
     echo "mumu ratio:       ${MUMU_RATIO}"
+    if [[ "$AMPLICON" == "18S-AMF" ]]; then
+        echo "AMF SILVA filter: $([ "$AMF_SILVA_FILTER" -eq 1 ] && echo 'enabled' || echo 'disabled')"
+    fi
 else
     echo "--Skipping ASV2OTU--"
 fi

@@ -291,6 +291,7 @@ echo "  --run-itsx                Run ITSx extraction (ITS1/ITS2 only; default: 
 echo "  --otu-cluster-id ID       VSEARCH clustering identity (default: 0.97)"
 echo "  --mumu-blast-id PCT       BLAST identity % for mumu (default: 94 for 16S-V4, 84 for others)"
 echo "  --mumu-ratio RATIO        mumu minimum_ratio (default: 100 for 16S-V4, 1 for others)"
+echo "  --skip-amf-filter         18S-AMF only: skip the SILVA BLAST screen that keeps only Glomeromycotina OTUs (default: run it)"
 echo "  --slurm-time TIME         SLURM walltime (HH:MM:SS, default: 12:00:00; 36:00:00 for 18S-V4; 48:00:00 for 16S-V4 and Aviti)"
 echo "  --slurm-mem MEM           SLURM memory allocation (default: 80GB + 20GB per 100 samples, max 240GB)"
 echo "  --help                    Show this help message"

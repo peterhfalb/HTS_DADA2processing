@@ -50,6 +50,12 @@ run_dada2processing --help
 ```
 **NOTE: It may take 10-15 minutes to install the necessary packages**
 
+**One-time setup for 18S-AMF (lab-wide, only needs to be done once):** the 18S-AMF pipeline screens OTUs against the full SILVA SSU database (see Step 6b). That BLAST database lives in the shared Kennedy lab taxonomy folder. If it has not been built yet, build it once with:
+```bash
+bash bin/setup_silva_blastdb.sh
+```
+This downloads SILVA 138.2 SSU Ref NR99 (~200 MB) and builds the BLAST database in `/projects/standard/kennedyp/shared/taxonomy/silva_138.2_NR99_blastdb/`.
+
 This install script will create a command you can run from anywhere called `run_dada2processing`
 
 After proper installation, the DADA2 processing pipeline should now be ready to go.
@@ -162,7 +168,9 @@ To run the script, ssh login to the cluster and run `run_dada2processing` from a
         You can discard you reverse reads if merging is failing/discarding many of your reads due to lack of overlap or poor R2 quality. This will usually not be relevant but may be desired for 18S-V4 datasets.
 10. Change default wall-time (runtime) on cluster (`--slurm-time`):
         If you have a large amount of samples or really large sequence files with high read depth, OR if a previous run attempt failed because it ran of of time, you may need to extend the time on the cluster using this command. The defaults should be suitable for datasets up to 200+ samples. Default walltimes are 12 hours in general, 36 hours for 18S-V4, and 48 hours for 16S-V4 and for any Aviti dataset.
-11. Change default memory allocation (`--slurm-mem`):
+11. Skip the AMF SILVA screen (`--skip-amf-filter`, 18S-AMF only):
+        By default, 18S-AMF OTUs are BLASTed against SILVA and only OTUs that match AMF (Glomeromycotina) are kept before MaarjAM taxonomy assignment (see Step 6b). Use this flag to turn that off and keep all OTUs.
+12. Change default memory allocation (`--slurm-mem`):
         If a previous job failed due to running out of memory. Up your memory allocation using this command. By default the pipeline requests 80gb plus 20gb for every 100 samples (capped at 240gb), which should be suitable for most all datasets.
 
 Expect a runtime of 1 - 12 hours for most Illumina datasets. Larger datasets (16S-V4, 18S-V4) and Aviti runs take longer, which is why the SLURM script requests more time for them by default (see above) just in case.
@@ -194,6 +202,7 @@ run_dada2processing [OPTIONS]
 #  --otu-cluster-id ID       VSEARCH clustering identity (default: 0.97)
 #  --mumu-blast-id PCT       BLAST identity % for mumu (default: 94 for 16S-V4, 84 for others)
 #  --mumu-ratio RATIO        mumu minimum_ratio (default: 100 for 16S-V4, 1 for others)
+#  --skip-amf-filter         18S-AMF only: skip the SILVA BLAST screen that keeps only Glomeromycotina OTUs (default: run it)
 #  --slurm-time TIME         SLURM walltime (HH:MM:SS, default: 12:00:00; 36:00:00 for 18S-V4; 48:00:00 for 16S-V4 and Aviti)
 #  --slurm-mem MEM           SLURM memory allocation (default: 80gb + 20gb per 100 samples, max 240gb)
 #  --help                    Show this help message
@@ -320,13 +329,24 @@ It works in two steps. All sequences are blasted against each other. Sequences w
 
 **Note 2:** *In preliminary testing, mumu was causing problematic merges of the ZyMock community in 16S-V4 bacterial datasets. This was due to a low blast % threshold considered for parent-daughter sequences, and a standard parent-daughter ratio of 1. To fix this, bacteria by default now run mumu with slightly different settings. The minimum BLAST % is 94% and the minimum ratio is 100. This is somewhat informed by the relatively more conserved nature of the 16S region, but is also somewhat arbitrarily chosen. Just expect that the mumu filtering step might merge comparatively less OTUs in 16S datasets compared to others. I do not expect this to change ecological inference. If you are still running into issues where the ZyMock community seems strange, contact me.*
 
+### Step 6b - AMF SILVA Screen (18S-AMF only)
+
+Because the MaarjAM database contains only AMF sequences, DADA2 will assign *every* sequence to Glomeromycota, including plants, other fungi and protists that the AMF primers co-amplify. To prevent this, the curated OTUs are first BLASTed against the full SILVA SSU Ref NR99 database, which covers all domains of life. An OTU is kept only if its best SILVA matches are AMF:
+
+1. Each OTU is BLASTed (megablast) against SILVA, keeping hits with at least 90% identity and 80% query coverage.
+2. The "near-top" hits are all hits whose bitscore is within 2% of that OTU's best hit (SILVA has many near-identical references, so there are usually several tied best hits).
+3. The OTU is kept if at least half of its near-top hits are in **Glomeromycotina** (the AMF subphylum). Otherwise it is discarded as `non_AMF`.
+4. OTUs with no hit passing the identity/coverage cutoffs are discarded as `no_confident_hit`.
+
+Only kept OTUs go on to MaarjAM taxonomy assignment and into the final OTU table. The number and percentage of OTUs and reads kept/discarded are reported in `qc_summary.txt`. Per-OTU decisions, per-sample read retention, and a list of discarded OTUs with their SILVA taxonomy are in `05_asv2otu/04b_amf_filter/`. The discarded list is a useful way to see which off-target groups your primers picked up. These cutoffs can be changed in `config.yaml` (`amf_min_id`, `amf_min_qcov`, `amf_top_pct`, `amf_min_frac`, `amf_target_regex`). Use `--skip-amf-filter` to turn the screen off. **Note:** this screen applies to the OTU table only; the ASV table is not filtered.
+
 ### Step 7 - DADA2 RDP Taxonomy Assignment
 
 After the OTUs have been created and curated, taxonomy is assigned to the centroid of each OTU using the exact same approach as above for ASV taxonomy assignment. 
 
 This will likely take the longest of any step in the process -- somewhere between 5-45 minutes depending on how many OTUs there are, and the size of the reference database (PR2 takes the longest). 
 
-**NOTE:** An important note about AMF taxonomy assignment - because the MaarjAM database includes ONLY AMF sequences, DADA2 can ONLY assign sequences as AMF. As such, a lot of OTUs which are definitely not AMF will be assigned to Mucoromycota/Glomeromycota with high bootstrap confidence. I would take all these assignments with a grain of salt, and my recommendation would be to only use Genus/Virtual Taxa assignments that have high confidence, or maybe Family-level assignments with high bootstrap. If you have suggestions for improving AMF filtering, please let me know as I am very open to suggestions!
+**NOTE:** An important note about AMF taxonomy assignment - because the MaarjAM database includes ONLY AMF sequences, DADA2 can ONLY assign sequences as AMF. The AMF SILVA screen (Step 6b) removes OTUs that are not AMF from the OTU table before this step, so the MaarjAM assignments in the OTU table should now be restricted to genuine AMF. This screen is new and still being trialled, so please check `05_asv2otu/04b_amf_filter/amf_filter_discarded.tsv` and your mock community, and let me know if anything looks off. The ASV table is NOT screened, so non-AMF ASVs there will still be assigned to Mucoromycota/Glomeromycota with high bootstrap confidence; take ASV-level assignments with a grain of salt and prefer high-confidence Genus/Virtual Taxa or Family-level assignments.
 
 ## Citations
 

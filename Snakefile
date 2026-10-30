@@ -35,6 +35,19 @@ OTU_CLUSTER_ID  = config.get("otu_cluster_id", "0.97")
 MUMU_BLAST_ID   = config.get("mumu_blast_id", "84")
 MUMU_RATIO      = config.get("mumu_ratio", "1")
 
+# AMF SILVA screen (18S-AMF only): BLAST mumu-curated OTUs against SILVA and keep
+# only OTUs whose near-top hits are mostly AMF, before MaarjAM taxonomy assignment
+AMF_FILTER       = AMPLICON == "18S-AMF" and str(config.get("amf_silva_filter", "1")) == "1"
+AMF_MIN_ID       = config.get("amf_min_id", "90")          # BLAST % identity floor
+AMF_MIN_QCOV     = config.get("amf_min_qcov", "80")        # BLAST % query coverage floor
+AMF_TOP_PCT      = config.get("amf_top_pct", "2")          # near-top window: within X% of best bitscore
+AMF_MIN_FRAC     = config.get("amf_min_frac", "0.5")       # min fraction of near-top hits that are AMF
+AMF_TARGET_REGEX = config.get("amf_target_regex", "Glomeromycotina")
+
+# SILVA SSU Ref NR99 BLAST database (built once with bin/setup_silva_blastdb.sh;
+# keep in sync with bin/run_dada2processing)
+SILVA_BLAST_DB = "/projects/standard/kennedyp/shared/taxonomy/silva_138.2_NR99_blastdb/SILVA_138.2_NR99"
+
 # Load primer sequences from external config file (single source of truth)
 import json
 primers_config_path = os.path.join(workflow.basedir, "workflow/config/primers.json")
