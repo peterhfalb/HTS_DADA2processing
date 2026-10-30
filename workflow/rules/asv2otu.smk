@@ -341,6 +341,7 @@ rule generate_otu_qc_summary:
         output_dir=OUTPUT_DIR,
         project=PROJECT_NAME,
         run_itsx="1" if (RUN_ITSX and AMPLICON in ("ITS1", "ITS2")) else "0",
+        cluster_id=OTU_CLUSTER_ID,
         pipeline_dir=workflow.basedir,
     log:
         OUTPUT_DIR + "/.logs/generate_otu_qc_summary.log",
@@ -350,6 +351,7 @@ rule generate_otu_qc_summary:
             {params.output_dir} \
             {params.project} \
             {params.run_itsx} \
+            {params.cluster_id} \
             2>&1 | tee {log}
         """
 
@@ -422,7 +424,7 @@ rule asv2otu_vsearch_readme:
         project_name=PROJECT_NAME,
     shell:
         """
-        cat > {output} << EOF
+        cat > {output} << 'EOF'
 # ASV to OTU Pipeline - Step 3: VSEARCH Clustering & Chimera Removal
 ## Directory: 05_asv2otu/03_vsearch/
 
@@ -431,22 +433,23 @@ This directory contains OTU sequences after clustering and chimera detection.
 ### Contents:
 
 **Output Files:**
-- `{params.project_name}.centroids`: Representative sequences for each OTU (after clustering, before chimera removal)
-- `{params.project_name}.otutable`: OTU abundance table with sample counts (post-chimera removal)
-- `otu_processing_summary.txt`: QC statistics for clustering and chimera removal steps
+- `{params.project_name}.centroids`: Representative sequences for each OTU (after clustering AND chimera removal)
+- `{params.project_name}.otutable`: OTU abundance table with sample counts, built by mapping every ASV to the post-chimera-removal centroids
+- `otu_processing_summary.txt`: QC statistics for clustering and chimera removal steps (key=value counts)
 
 **QC Metrics (from otu_processing_summary.txt):**
-- Input ASVs: Number of unique sequences entering clustering
-- OTUs after clustering (97% identity): Sequences clustered at 97% identity
-- Chimeras removed: Count of chimeric sequences detected and removed
-- OTUs after chimera removal: Final count before mumu curation
-- % chimeric: Percentage of clustered OTUs that were detected as chimeras
+- INPUT_ASVS: Number of unique sequences entering clustering
+- POST_CLUSTER: OTUs after clustering, before chimera removal
+- CHIMERAS_REMOVED: Count of chimeric OTU centroids detected and removed
+- POST_CHIMERA: OTUs remaining after chimera removal (the number that goes into mumu curation)
+- PCT_CHIMERIC: Percentage of clustered OTUs that were detected as chimeras
+- PCT_ASVS_REMOVED: Percentage of input ASVs merged into another by clustering
 
 ### Processing Details:
 - **Abundance sorting:** Sequences sorted by decreasing abundance (VSEARCH --sortbysize)
-- **Clustering:** Greedy clustering at 97% identity (VSEARCH --cluster_size)
-- **Chimera detection:** De novo chimera detection with size-aware scoring
-- **Mapping:** All original ASVs mapped back to OTU centroids for abundance accounting
+- **Clustering:** Greedy clustering at the specified identity, 97% by default (VSEARCH --cluster_size)
+- **Chimera detection:** De novo chimera detection on the cluster centroids with size-aware scoring
+- **Mapping:** All original ASVs mapped back to the post-chimera-removal centroids at the same identity (VSEARCH --usearch_global) for abundance accounting. ASVs with no centroid at or above the clustering identity (e.g. members of a cluster whose centroid was removed as chimeric) are not counted in the OTU table
 
 ### Next Step:
 OTU centroids and abundance table proceed to mumu curation for redundancy reduction.
@@ -461,7 +464,7 @@ rule asv2otu_mumu_readme:
         project_name=PROJECT_NAME,
     shell:
         """
-        cat > {output} << EOF
+        cat > {output} << 'EOF'
 # ASV to OTU Pipeline - Step 4: mumu Curation
 ## Directory: 05_asv2otu/04_mumu/
 

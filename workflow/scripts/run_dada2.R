@@ -135,6 +135,25 @@ if (fwd_reads_only) {
 head(out)
 cat("\n")
 
+# Samples with no reads passing the filter (e.g. negative controls) get no filtered
+# file written, which would make derepFastq() fail. Exclude them from denoising here;
+# they are re-added as all-zero rows after chimera removal so they still appear in
+# the output tables and the summary.
+all_sample_names <- sample.names
+filt_ok <- file.exists(filtFs) & out[, 2] > 0
+if (!fwd_reads_only) filt_ok <- filt_ok & file.exists(filtRs)
+
+if (!any(filt_ok)) {
+  stop("No reads passed filtering in any sample")
+}
+if (!all(filt_ok)) {
+  cat("WARNING: ", sum(!filt_ok), " sample(s) had no reads pass filtering and will be reported as zeros: ",
+      paste(all_sample_names[!filt_ok], collapse = ", "), "\n\n")
+  sample.names <- sample.names[filt_ok]
+  filtFs <- filtFs[filt_ok]
+  filtRs <- filtRs[filt_ok]
+}
+
 # ==============================================================================
 # DEREPLICATION
 # ==============================================================================
@@ -249,6 +268,14 @@ if (platform == "aviti") {
   )
 }
 
+# Re-add samples excluded after filtering as all-zero rows, in original sample order
+missing_samples <- setdiff(all_sample_names, rownames(seqtab.nochim))
+if (length(missing_samples) > 0) {
+  zero_rows <- matrix(0L, nrow = length(missing_samples), ncol = ncol(seqtab.nochim),
+                      dimnames = list(missing_samples, colnames(seqtab.nochim)))
+  seqtab.nochim <- rbind(seqtab.nochim, zero_rows)[all_sample_names, , drop = FALSE]
+}
+
 cat("Dimensions after chimera removal:", dim(seqtab.nochim), "\n")
 saveRDS(seqtab.nochim, file.path(output_dir, "seqtab_nochim.rds"))
 
@@ -266,13 +293,20 @@ cat("==================\n")
 
 getN <- function(x) sum(getUniques(x))
 
+# Per-step counts for all samples; samples excluded after filtering count as 0
+fill_zero <- function(x) {
+  v <- setNames(rep(0, length(all_sample_names)), all_sample_names)
+  v[names(x)] <- x
+  v
+}
+
 summary_tab <- data.frame(
-  row.names = sample.names,
+  row.names = all_sample_names,
   dada2_input = out[, 1],
   filtered = out[, 2],
-  dada_f = sapply(dadaFs, getN),
-  dada_r = if (fwd_reads_only) NA else sapply(dadaRs, getN),
-  merged = if (fwd_reads_only) NA else sapply(merged_amplicons, getN),
+  dada_f = fill_zero(sapply(dadaFs, getN)),
+  dada_r = if (fwd_reads_only) NA else fill_zero(sapply(dadaRs, getN)),
+  merged = if (fwd_reads_only) NA else fill_zero(sapply(merged_amplicons, getN)),
   nonchim = rowSums(seqtab.nochim)
 )
 
@@ -291,9 +325,10 @@ cat("Database:", taxonomy_db, "\n")
 
 seqtab.nochim <- readRDS(file.path(output_dir, "seqtab_nochim.rds"))
 
-# Determine taxonomy levels: only PR2 uses extended hierarchy
-# All others use standard 7-level Kingdom → Species
-use_extended_levels <- grepl("pr2", taxonomy_db, ignore.case = TRUE)
+# Determine taxonomy levels from the database choice alone (not the amplicon):
+# PR2 uses an extended 9-level hierarchy, all others use standard 7-level Kingdom → Species
+# (keep in sync with assign_otu_taxonomy.R)
+use_extended_levels <- db_name == "PR2"
 tax_levels_standard <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")
 tax_levels_extended <- c("Domain", "Supergroup", "Division", "Subdivision", "Class", "Order", "Family", "Genus", "Species")
 tax_levels <- if (use_extended_levels) tax_levels_extended else tax_levels_standard

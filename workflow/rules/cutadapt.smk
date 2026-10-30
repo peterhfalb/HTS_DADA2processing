@@ -119,7 +119,7 @@ rule summarize_primer_logs:
     shell:
         """
         grep "passing" {input.logs} > {output.summary} 2>&1 || true
-        cat > {output.readme} << EOF
+        cat > {output.readme} << 'EOF'
 # Primer Trimming Results
 ## Directory: 02_primer_trimmed/
 

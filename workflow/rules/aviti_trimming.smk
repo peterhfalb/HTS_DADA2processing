@@ -3,6 +3,36 @@ Aviti trimming rules: 3-step Trimmomatic-cutadapt-Trimmomatic workflow
 """
 
 # ============================================================================
+# Step 0: Adapter detection stats (QC only; reads are not modified)
+# ============================================================================
+
+rule aviti_adapter_stats:
+    """Count reads containing adapters, using the same cutadapt adapter set as the
+    Illumina branch, so the adapter QC columns are comparable across platforms.
+    Trimmomatic does not report per-read adapter counts."""
+    input:
+        r1=get_input_r1,
+        r2=get_input_r2,
+    output:
+        log=OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.log.txt",
+        json=OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.json",
+    params:
+        adapter_flags=" ".join(f"-a {a} -A {a}" for a in DETECTED_ADAPTERS["adapters"]),
+    log:
+        OUTPUT_DIR + "/.logs/aviti_adapter_stats_{sample}.log",
+    threads: 4
+    shell:
+        """
+        mkdir -p $(dirname {output.log})
+        cutadapt --cores {threads} --no-trim {params.adapter_flags} \
+          --json={output.json} \
+          -o /dev/null \
+          -p /dev/null \
+          {input.r1} {input.r2} \
+          > {output.log} 2>&1
+        """
+
+# ============================================================================
 # Step 1: Trimmomatic - First Nextera adapter pass
 # ============================================================================
 
@@ -56,10 +86,11 @@ rule aviti_trim_primers:
         rev_primer=EFFECTIVE_REV,
     log:
         OUTPUT_DIR + "/.logs/aviti_cutadapt_primers_{sample}.log",
+    threads: 4
     shell:
         """
         mkdir -p $(dirname {output.log})
-        cutadapt --cores 4 --pair-filter=any --minimum-length 100 --discard-untrimmed \
+        cutadapt --cores {threads} --pair-filter=any --minimum-length 100 --discard-untrimmed \
           -g {params.fwd_primer} \
           -G {params.rev_primer} \
           --json={output.json} \

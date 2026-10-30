@@ -1,5 +1,8 @@
 # DADA2 Snakemake Pipeline Configuration Template
-# Copy this file to config.yaml and customize for your project
+#
+# NOTE: In normal use you do NOT write this file by hand. `run_dada2processing`
+# generates config.yaml in your output directory (including the sample list and
+# the per-amplicon defaults below). This template documents every key it writes.
 
 # ============================================================================
 # REQUIRED PARAMETERS
@@ -8,13 +11,14 @@
 # Amplicon type: 16S-V4, ITS1, ITS2, 18S-AMF, or 18S-V4
 amplicon: "16S-V4"
 
-# Sequencing platform: illumina, aviti, or pacbio
+# Sequencing platform: illumina or aviti
 platform: "illumina"
 
-# Data quality: raw or trimmed (raw = demultiplexed FASTQ, trimmed = already adapter-trimmed)
-quality: "raw"
+# Sequence quality: good or bad
+# "bad" makes some DADA2 filtering parameters (maxEE, and truncLen for ITS) more stringent
+quality: "good"
 
-# Path to directory containing input FASTQ files
+# Path to directory containing the original demultiplexed FASTQ files
 fastq_dir: "/path/to/fastq/directory"
 
 # Path to output directory (will be created if it doesn't exist)
@@ -26,9 +30,9 @@ project_name: "my_project"
 # Email address for SLURM job notifications
 email: "user@example.com"
 
-# Sample list: provide either:
-#   1. A list of sample names (FASTQ files should be: <fastq_dir>/<sample>_R1_001.fastq.gz and <sample>_R2_001.fastq.gz)
-#   2. OR a path to a sample file (one sample per line)
+# Sample list: a YAML list of sample names (a plain list only; a path to a sample file is not supported).
+# Each sample needs <output_dir>/00_raw/<sample>_R1_001.fastq.gz and <sample>_R2_001.fastq.gz
+# (or the same with _L001_ before R1/R2). run_dada2processing creates these as symlinks to fastq_dir.
 samples:
   - sample_001
   - sample_002
@@ -46,20 +50,23 @@ samples:
 # Default: 0 (run full pipeline). Set to 1 to skip OTU pipeline.
 # skip_otu: "0"
 
-# Run ITSx filtering to remove non-ITS sequences (recommended for ITS amplicons)
-# Default: 0 (no filtering). Set to 1 to filter with ITSx.
+# Run ITSx extraction to trim conserved flanking regions and drop non-ITS sequences (ITS1/ITS2 only)
+# Default: 0 (off, preserves full-length ITS and synthetic mock community members). Set to 1 to enable.
 # run_itsx: "0"
 
 # OTU clustering identity threshold (range: 0.0-1.0)
-# Default: 0.97 (97% identity OTUs, standard for 16S)
+# Default: 0.97 (97% identity OTUs)
 # otu_cluster_id: "0.97"
 
 # MUMU curation: BLAST identity threshold for merging OTUs (range: 0-100)
-# Default: 84 (84% identity, balances sensitivity and specificity)
+# Default: 94 for 16S-V4, 84 for all other amplicons
+# (run_dada2processing sets this per amplicon; if you run snakemake directly the fallback is 84)
 # mumu_blast_id: "84"
 
-# MUMU curation: Abundance ratio threshold for merging OTUs (range: 0-100)
-# Default: 1 (OTU must be >=1% of parent OTU abundance to survive)
+# MUMU curation: minimum parent/daughter abundance ratio for a merge (mumu --minimum_ratio)
+# Higher = more conservative (fewer merges).
+# Default: 100 for 16S-V4, 1 for all other amplicons
+# (run_dada2processing sets this per amplicon; if you run snakemake directly the fallback is 1)
 # mumu_ratio: "1"
 
 # Override default taxonomy database for this amplicon

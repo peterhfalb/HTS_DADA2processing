@@ -2,22 +2,25 @@
 # generate_otu_qc_summary.R
 # Generates comprehensive OTU QC summary by reading intermediate files from each step
 #
-# Usage: Rscript generate_otu_qc_summary.R <output_dir> <project_name> <run_itsx>
+# Usage: Rscript generate_otu_qc_summary.R <output_dir> <project_name> <run_itsx> [<cluster_id>]
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 3) {
-  stop("Usage: Rscript generate_otu_qc_summary.R <output_dir> <project_name> <run_itsx>")
+  stop("Usage: Rscript generate_otu_qc_summary.R <output_dir> <project_name> <run_itsx> [<cluster_id>]")
 }
 
 OUTPUT_DIR  <- args[1]
 PROJECT     <- args[2]
 # Parse boolean: handle "1", "true", "True", "yes", etc.
 RUN_ITSX    <- tolower(args[3]) %in% c("1", "true", "yes")
+# VSEARCH clustering identity, used only for labelling the summary
+CLUSTER_ID  <- if (length(args) >= 4) args[4] else "0.97"
 
 cat("Generating OTU QC Summary...\n")
 cat("Output dir: ", OUTPUT_DIR, "\n")
 cat("Project:    ", PROJECT, "\n")
-cat("Run ITSx:   ", RUN_ITSX, "\n\n")
+cat("Run ITSx:   ", RUN_ITSX, "\n")
+cat("Cluster ID: ", CLUSTER_ID, "\n\n")
 
 # ============================================================================
 # Collect counts from each step
@@ -155,7 +158,7 @@ if (!is.na(post_itsx)) {
 }
 
 if (!is.na(post_cluster)) {
-  summary_lines <- c(summary_lines, paste("OTUs after clustering (0.97 identity)", post_cluster, sep = "\t"))
+  summary_lines <- c(summary_lines, paste(paste0("OTUs after clustering (", CLUSTER_ID, " identity)"), post_cluster, sep = "\t"))
 }
 
 if (!is.na(pct_asvs_removed)) {

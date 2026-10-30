@@ -44,9 +44,10 @@ cat("Sequences to classify:", length(sequences), "\n")
 
 cat("Running assignTaxonomy...\n")
 
-# Set taxonomy levels based on primer set and database
+# Set taxonomy levels based on the database choice alone (not the primer set)
 # These must exactly match the number of semicolon-delimited levels in the database headers
-if (PRIMER_SET == "18S-V4" && DB_NAME == "PR2") {
+# (keep in sync with run_dada2.R)
+if (DB_NAME == "PR2") {
   # PR2 uses a non-standard 9-level hierarchy
   tax_levels <- c("Domain", "Supergroup", "Division", "Subdivision",
                   "Class", "Order", "Family", "Genus", "Species")

@@ -150,7 +150,7 @@ To run the script, ssh login to the cluster and run `run_dada2processing` from a
         Use to manually input a primer sequence if either a. the pipeline detects a different primer than default or b. you used a non-canonical primer not included on the Kennedy Lab primer list.
 4. Whether to skip OTUing (`--skip-otu`):
         OTUing is generally recommended under the following scenarios: bulk environmental non-host-associated soil samples, Aviti sequencing, non-bacterial primer sets (ITS, 18S). OTUing is however generally applicable across all datasets and will serve to further reduce possible noise in the dataset.
-5. Whether to run ITSx (`--run-ITSx`):
+5. Whether to run ITSx (`--run-itsx`):
         *ITSx is a program which removes the highly conserved regions flanking the ITS variable region. While this can improve clustering by preventing inflated similarity from conserved regions, ITSx can also remove or truncate sequences with non-standard ITS structures, including synthetic mock community members. **By default, ITSx is disabled to preserve full-length ITS sequences and avoid issues with mock communities.** If your dataset does not include synthetic controls and you want the benefits of ITS region extraction, use the `--run-itsx` flag to enable it.*    
 6. Manually specify cluster percentage level (`--otu-cluster-id`):
         Clustering is by default set to 97% which is the most commonly accepted species-level threshold across groups. However, if you want to be more or less conservative, you can increase or decrease the similarity threshold. The bacterial SSU gene (16S-V4) is generally more conserved, so there may an argument for raising the similarity threshold for that group.
@@ -161,11 +161,11 @@ To run the script, ssh login to the cluster and run `run_dada2processing` from a
 9. Keep only forward reads (`--fwd-reads-only`):
         You can discard you reverse reads if merging is failing/discarding many of your reads due to lack of overlap or poor R2 quality. This will usually not be relevant but may be desired for 18S-V4 datasets.
 10. Change default wall-time (runtime) on cluster (`--slurm-time`):
-        If you have a large amount of samples or really large sequence files with high read depth, OR if a previous run attempt failed because it ran of of time, you may need to extend the time on the cluster using this command. The defaults should be suitable for datasets up to 200+ samples.
+        If you have a large amount of samples or really large sequence files with high read depth, OR if a previous run attempt failed because it ran of of time, you may need to extend the time on the cluster using this command. The defaults should be suitable for datasets up to 200+ samples. Default walltimes are 12 hours in general, 36 hours for 18S-V4, and 48 hours for 16S-V4 and for any Aviti dataset.
 11. Change default memory allocation (`--slurm-mem`):
-        If a previous job failed due to running out of memory. Up your memory allocation using this command. The default (80gb) should be suitable for most all datasets.
+        If a previous job failed due to running out of memory. Up your memory allocation using this command. By default the pipeline requests 80gb plus 20gb for every 100 samples (capped at 240gb), which should be suitable for most all datasets.
 
-Expect a runtime of 1 - 12 hours. It should not go much longer than that, but the SLURM script requests 12 hours of time on the cluster just in case (24 hours for 16S-V4 datasets due to larger size).
+Expect a runtime of 1 - 12 hours for most Illumina datasets. Larger datasets (16S-V4, 18S-V4) and Aviti runs take longer, which is why the SLURM script requests more time for them by default (see above) just in case.
 
 **Run the pipeline from anywhere**
 ```bash
@@ -188,14 +188,14 @@ run_dada2processing [OPTIONS]
 #  --taxonomy-database DB    Override taxonomy database: SILVA, UNITE, PR2, MaarjAM, EukaryomeSSU, EukaryomeITS
 #  --fwd-primer SEQUENCE     Override forward primer for this amplicon (DNA string)
 #  --rev-primer SEQUENCE     Override reverse primer for this amplicon (DNA string)
+#  --fwd-reads-only          Use forward reads only; skip reverse read processing (default: off)
 #  --skip-otu                Skip OTU clustering pipeline (default: run OTU pipeline)
 #  --run-itsx                Run ITSx extraction (ITS1/ITS2 only; default: off)
 #  --otu-cluster-id ID       VSEARCH clustering identity (default: 0.97)
 #  --mumu-blast-id PCT       BLAST identity % for mumu (default: 94 for 16S-V4, 84 for others)
 #  --mumu-ratio RATIO        mumu minimum_ratio (default: 100 for 16S-V4, 1 for others)
-#  --slurm-time TIME         SLURM walltime (HH:MM:SS, default: 12:00:00, 24:00:00 for 16S-V4)
-#  --slurm-mem MEM           SLURM memory allocation (default: 80gb)
-#  --jobs JOBS               Max parallel Snakemake jobs (default: 16)
+#  --slurm-time TIME         SLURM walltime (HH:MM:SS, default: 12:00:00; 36:00:00 for 18S-V4; 48:00:00 for 16S-V4 and Aviti)
+#  --slurm-mem MEM           SLURM memory allocation (default: 80gb + 20gb per 100 samples, max 240gb)
 #  --help                    Show this help message
 
 # Examples:

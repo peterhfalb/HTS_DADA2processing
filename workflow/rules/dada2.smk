@@ -7,21 +7,13 @@ DADA2 rule: denoising, merging, chimera removal, taxonomy assignment
 # ============================================================================
 
 def get_adapter_logs(wildcards):
-    """Return adapter trimming logs based on platform"""
-    if PLATFORM == "aviti":
-        # Aviti uses Trimmomatic stderr logs (contain summary statistics)
-        return expand(OUTPUT_DIR + "/.logs/aviti_trimmomatic_pass1_{sample}.log", sample=SAMPLES)
-    else:
-        # Illumina uses cutadapt logs
-        return expand(OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.log.txt", sample=SAMPLES)
+    """Return adapter cutadapt logs (same location on both platforms: trim_adapters on
+    Illumina, aviti_adapter_stats on Aviti)"""
+    return expand(OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.log.txt", sample=SAMPLES)
 
 def get_adapter_jsons(wildcards):
-    """Return adapter trimming JSON logs (Illumina only)"""
-    if PLATFORM == "aviti":
-        # Aviti doesn't have JSON logs, return empty list (handled by rule)
-        return []
-    else:
-        return expand(OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.json", sample=SAMPLES)
+    """Return adapter cutadapt JSON logs (same location on both platforms)"""
+    return expand(OUTPUT_DIR + "/01_adapter/01_logs/cutadapt.{sample}.json", sample=SAMPLES)
 
 def get_primer_logs(wildcards):
     """Return primer trimming logs based on platform"""
@@ -103,7 +95,7 @@ rule dada2_readme:
         db_name=DB_NAME,
     shell:
         """
-        cat > {output} << EOF
+        cat > {output} << 'EOF'
 # DADA2 Denoising and Taxonomy Assignment Results
 ## Directory: 03_dada2/
 

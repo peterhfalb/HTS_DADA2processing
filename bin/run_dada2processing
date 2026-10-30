@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # DADA2 Snakemake Pipeline CLI Entry Point
-# Usage: run_dada2processing --amplicon 16S-V4 --fastq-dir /path/to/raw --output-dir /path/to/output --email user@umn.edu [--quality good|bad] [--jobs 16]
+# Usage: run_dada2processing --amplicon 16S-V4 --fastq-dir /path/to/raw --output-dir /path/to/output --email user@umn.edu [--quality good|bad]
 
 show_usage() {
     cat << EOF
@@ -27,9 +27,8 @@ Optional arguments:
   --otu-cluster-id ID       VSEARCH clustering identity (default: 0.97)
   --mumu-blast-id PCT       BLAST identity % for mumu (default: 94 for 16S-V4, 84 for others)
   --mumu-ratio RATIO        mumu minimum_ratio (default: 100 for 16S-V4, 1 for others)
-  --jobs JOBS               Max parallel Snakemake jobs (default: 16)
-  --slurm-time TIME         SLURM walltime (HH:MM:SS, default: 12:00:00)
-  --slurm-mem MEM           SLURM memory allocation (default: 60gb)
+  --slurm-time TIME         SLURM walltime (HH:MM:SS, default: 12:00:00; 36:00:00 for 18S-V4; 48:00:00 for 16S-V4 and Aviti)
+  --slurm-mem MEM           SLURM memory allocation (default: 80gb + 20gb per 100 samples, max 240gb)
   --help                    Show this help message
 
 Examples:
@@ -43,7 +42,6 @@ EOF
 # Defaults
 QUALITY="good"
 PLATFORM=""
-JOBS=16
 AMPLICON=""
 FASTQ_DIR=""
 OUTPUT_DIR=""
@@ -87,10 +85,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         --platform)
             PLATFORM="$2"
-            shift 2
-            ;;
-        --jobs)
-            JOBS="$2"
             shift 2
             ;;
         --taxonomy-database)
@@ -310,7 +304,6 @@ set -euo pipefail
 CONFIG_FILE="PLACEHOLDER_CONFIG"
 LOG_FILE="PLACEHOLDER_LOG"
 PIPELINE_DIR="PLACEHOLDER_PIPELINE_DIR"
-JOBS=PLACEHOLDER_JOBS
 OUTPUT_DIR="PLACEHOLDER_OUTPUT_DIR"
 
 set +u  # Temporarily disable strict mode for conda/mamba
@@ -347,7 +340,6 @@ snakemake \
   --snakefile "$PIPELINE_DIR/Snakefile" \
   --configfile "$CONFIG_FILE" \
   --cores $SLURM_NTASKS \
-  --jobs $JOBS \
   --rerun-incomplete \
   --printshellcmds \
   2>&1 | tee "$LOG_FILE"
@@ -362,7 +354,6 @@ sed -i.bak "s|PLACEHOLDER_CONFIG|$CONFIG_FILE|g" "$SLURM_SCRIPT"
 sed -i.bak "s|PLACEHOLDER_LOG|$LOG_FILE|g" "$SLURM_SCRIPT"
 sed -i.bak "s|PLACEHOLDER_OUTPUT_DIR|$OUTPUT_DIR|g" "$SLURM_SCRIPT"
 sed -i.bak "s|PLACEHOLDER_PIPELINE_DIR|$PIPELINE_DIR|g" "$SLURM_SCRIPT"
-sed -i.bak "s|PLACEHOLDER_JOBS|$JOBS|g" "$SLURM_SCRIPT"
 sed -i.bak "s|PLACEHOLDER_SLURM_TIME|$SLURM_TIME|g" "$SLURM_SCRIPT"
 sed -i.bak "s|PLACEHOLDER_SLURM_MEM|$SLURM_MEM|g" "$SLURM_SCRIPT"
 rm -f "$SLURM_SCRIPT.bak"
@@ -390,15 +381,15 @@ set -u  # Re-enable strict mode
 PRIMERS_JSON="$PIPELINE_DIR/workflow/config/primers.json"
 
 # Determine which primers to validate using external script
-read VALIDATE_FWD VALIDATE_REV < <(python3 "$SCRIPT_DIR/get_primers.py" \
+read DEFAULT_FWD DEFAULT_REV < <(python3 "$SCRIPT_DIR/get_primers.py" \
     --primers-json "$PRIMERS_JSON" \
     --amplicon "$AMPLICON") || {
   echo "ERROR: Failed to extract primers from $PRIMERS_JSON"
   exit 1
 }
 
-VALIDATE_FWD="${FWD_PRIMER_OVERRIDE:-$VALIDATE_FWD}"
-VALIDATE_REV="${REV_PRIMER_OVERRIDE:-$VALIDATE_REV}"
+VALIDATE_FWD="${FWD_PRIMER_OVERRIDE:-$DEFAULT_FWD}"
+VALIDATE_REV="${REV_PRIMER_OVERRIDE:-$DEFAULT_REV}"
 
 echo ""
 echo "Scanning fastq files for expected primers..."
@@ -543,26 +534,9 @@ else
 fi
 echo ""
 echo "--PRIMERS--"
-# Resolve and display forward primer (may include auto-detected value)
-DISPLAY_FWD="${FWD_PRIMER_OVERRIDE:-$(
-  case "$AMPLICON" in
-    16S-V4)  echo "GTGYCAGCMGCCGCGGTAA" ;;
-    ITS1)    echo "CTTGGTCATTTAGAGGAAGTAA" ;;
-    ITS2)    echo "TCGATGAAGAACGCAGCG" ;;
-    18S-AMF) echo "CAGCCGCGGTAATTCCAGCT" ;;
-    18S-V4)  echo "TTAAARVGYTCGTAGTYG" ;;
-  esac
-)}"
-
-DISPLAY_REV="${REV_PRIMER_OVERRIDE:-$(
-  case "$AMPLICON" in
-    16S-V4)  echo "GGACTACNVGGGTWTCTAAT" ;;
-    ITS1)    echo "GCTGCGTTCTTCATCGATGC" ;;
-    ITS2)    echo "TCCTCCGCTTATTGATATGC" ;;
-    18S-AMF) echo "GAACCCAAACACTTTGGTTTCC" ;;
-    18S-V4)  echo "CCGTCAATTHCTTYAART" ;;
-  esac
-)}"
+# Resolve and display primers (defaults come from primers.json; may include auto-detected values)
+DISPLAY_FWD="${FWD_PRIMER_OVERRIDE:-$DEFAULT_FWD}"
+DISPLAY_REV="${REV_PRIMER_OVERRIDE:-$DEFAULT_REV}"
 
 echo "Fwd primer:       $DISPLAY_FWD"
 echo "Rev primer:       $DISPLAY_REV"
