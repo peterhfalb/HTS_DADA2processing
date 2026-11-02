@@ -75,8 +75,8 @@ samples:
 # (run_dada2processing sets this per amplicon; if you run snakemake directly the fallback is 1)
 # mumu_ratio: "1"
 
-# AMF SILVA screen (18S-AMF only): BLAST curated OTUs against SILVA SSU Ref NR99 and keep
-# only OTUs whose near-top hits are mostly AMF, before MaarjAM taxonomy assignment.
+# AMF SILVA screen (18S-AMF only): BLAST ASVs and curated OTUs against SILVA SSU Ref NR99 and keep
+# only those whose near-top hits are mostly AMF, before MaarjAM taxonomy assignment.
 # Default: 1 (on). Set to 0 to disable (CLI: --skip-amf-filter).
 # amf_silva_filter: "1"
 # BLAST % identity and % query coverage floors for a hit to count

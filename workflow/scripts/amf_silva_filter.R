@@ -1,9 +1,11 @@
 #!/usr/bin/env Rscript
 # amf_silva_filter.R
-# Keeps only OTUs whose near-top SILVA BLAST hits are mostly AMF (18S-AMF only).
+# Keeps only OTUs (or ASVs) whose near-top SILVA BLAST hits are mostly AMF (18S-AMF only).
 #
 # Usage: Rscript amf_silva_filter.R <blast_tsv> <centroids_fasta> <otu_table> <map_file> <out_dir> \
-#                                   <project> <top_pct> <min_frac> <target_regex>
+#                                   <project> <top_pct> <min_frac> <target_regex> [feature=OTU]
+#
+# feature labels the logs and count keys ("OTU" or "ASV"); see asv_amf_filter.R for ASV input.
 #
 # blast_tsv columns (blastn -outfmt "6 qseqid sseqid pident length qcovhsp bitscore evalue stitle"),
 # already restricted to hits passing the identity and query coverage cutoffs.
@@ -25,6 +27,7 @@ PROJECT      <- args[6]
 TOP_PCT      <- as.numeric(args[7])
 MIN_FRAC     <- as.numeric(args[8])
 TARGET_REGEX <- args[9]
+FEATURE      <- if (length(args) >= 10) args[10] else "OTU"
 
 cat("BLAST results:  ", BLAST_TSV, "\n")
 cat("Centroids:      ", FASTA, "\n")
@@ -61,7 +64,7 @@ otu_reads <- tibble(OTU_ID = otu$OTU_ID, total_reads = rowSums(otu[, sample_cols
 
 map <- read_csv(MAP_FILE, show_col_types = FALSE)
 
-cat("OTUs in curated table:", nrow(otu), "\n\n")
+cat(FEATURE, "s in input table: ", nrow(otu), "\n\n", sep = "")
 
 # ------------------------------------------------------------------------------
 # Decide per OTU
@@ -111,13 +114,13 @@ n_no_hit    <- sum(decisions$reason == "no_confident_hit")
 reads_total <- sum(decisions$total_reads)
 reads_kept  <- sum(decisions$total_reads[decisions$decision == "keep"])
 
-cat("OTUs kept:               ", n_kept, "/", n_total, "\n")
-cat("OTUs discarded (non-AMF):", n_non_amf, "\n")
-cat("OTUs discarded (no hit): ", n_no_hit, "\n")
+cat(FEATURE, "s kept:                ", n_kept, " / ", n_total, "\n", sep = "")
+cat(FEATURE, "s discarded (non-AMF): ", n_non_amf, "\n", sep = "")
+cat(FEATURE, "s discarded (no hit):  ", n_no_hit, "\n", sep = "")
 cat("Reads kept:              ", reads_kept, "/", reads_total, "\n\n")
 
 if (n_kept == 0) {
-  stop("No OTUs passed the AMF SILVA filter. Check the BLAST database, target regex (",
+  stop("No ", FEATURE, "s passed the AMF SILVA filter. Check the BLAST database, target regex (",
        TARGET_REGEX, ") and amf_filter_otu_decisions.tsv")
 }
 
@@ -158,11 +161,11 @@ write_tsv(per_sample, file.path(OUT_DIR, "amf_filter_per_sample.tsv"), na = "")
 # Counts for the OTU QC summary (key=value, like the VSEARCH counts file)
 pct <- function(x, n) if (n > 0) sprintf("%.1f", 100 * x / n) else "NA"
 writeLines(c(
-  paste0("AMF_INPUT_OTUS=", n_total),
-  paste0("AMF_KEPT_OTUS=", n_kept),
+  paste0("AMF_INPUT_", FEATURE, "S=", n_total),
+  paste0("AMF_KEPT_", FEATURE, "S=", n_kept),
   paste0("AMF_DISCARDED_NON_AMF=", n_non_amf),
   paste0("AMF_DISCARDED_NO_HIT=", n_no_hit),
-  paste0("AMF_PCT_OTUS_DISCARDED=", pct(n_total - n_kept, n_total)),
+  paste0("AMF_PCT_", FEATURE, "S_DISCARDED=", pct(n_total - n_kept, n_total)),
   paste0("AMF_READS_TOTAL=", reads_total),
   paste0("AMF_READS_KEPT=", reads_kept),
   paste0("AMF_PCT_READS_RETAINED=", pct(reads_kept, reads_total))
