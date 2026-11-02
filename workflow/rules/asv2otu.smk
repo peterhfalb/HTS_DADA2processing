@@ -455,7 +455,7 @@ rule asv2otu_input_readme:
 ## Directory: 05_asv2otu/01_input/
 
 This directory contains the prepared input files for OTU clustering, derived from the ASV table
-(the DADA2 output, or the table supplied with --asv-table in OTU-only mode).
+(DADA2's unfiltered ASV counts, or the table supplied with --asv-table in OTU-only mode).
 
 ### Contents:
 
@@ -672,7 +672,7 @@ This directory contains the complete ASV-to-OTU clustering and curation workflow
 ### Pipeline Steps:
 
 **Step 1: Input Preparation** (01_input/)
-- Converts DADA2 ASV table to FASTA and abundance formats
+- Converts DADA2's unfiltered ASV counts to FASTA and abundance formats
 - Outputs: Centroid sequences, abundance table, sample map
 
 **Step 2: ITSx Extraction** (02_itsx/)
@@ -768,6 +768,7 @@ rule finalize_outputs:
         project=PROJECT_NAME,
         db_name=DB_NAME,
         skip_otu=SKIP_OTU,
+        amf_filter="1" if AMF_FILTER else "0",
         pipeline_dir=workflow.basedir,
     log:
         OUTPUT_DIR + "/.logs/finalize_outputs.log",
@@ -778,5 +779,6 @@ rule finalize_outputs:
             {params.project} \
             {params.db_name} \
             {params.skip_otu} \
+            {params.amf_filter} \
             2>&1 | tee {log}
         """

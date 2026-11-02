@@ -6,7 +6,7 @@
 # 3. Combines QC tables and writes to main directory
 # 4. Generates README for main directory
 #
-# Usage: Rscript finalize_outputs.R <output_dir> <project_name> <db_name> <skip_otu>
+# Usage: Rscript finalize_outputs.R <output_dir> <project_name> <db_name> <skip_otu> [amf_filter=0]
 
 library(dplyr)
 library(readr)
@@ -22,6 +22,7 @@ DB_NAME     <- args[3]
 # Handle both Snakemake Python booleans ("True"/"False") and shell numbers ("0"/"1")
 skip_otu_str <- tolower(args[4])
 SKIP_OTU    <- skip_otu_str %in% c("true", "1", "yes")
+AMF_FILTER  <- length(args) >= 5 && args[5] == "1"
 
 setwd(OUTPUT_DIR)
 
@@ -78,6 +79,31 @@ if (file.exists(qc_per_sample_path)) {
 
 # Prepare output QC table (start with per-sample)
 qc_final <- qc_per_sample
+
+# Append ASV AMF SILVA screen counts if the screen was run
+asv_amf_path <- "03_dada2/amf_filter/amf_filter_counts.txt"
+if (AMF_FILTER && file.exists(asv_amf_path)) {
+  parts <- strsplit(readLines(asv_amf_path), "=", fixed = TRUE)
+  amf <- setNames(lapply(parts, `[`, 2), vapply(parts, `[`, "", 1))
+  amf_lines <- c(
+    "# ASV AMF SILVA Screen",
+    paste0("ASVs entering AMF SILVA filter: ", amf$AMF_INPUT_ASVS),
+    paste0("ASVs passing AMF SILVA filter: ", amf$AMF_KEPT_ASVS),
+    paste0("ASVs discarded by AMF filter: non-AMF: ", amf$AMF_DISCARDED_NON_AMF),
+    paste0("ASVs discarded by AMF filter: no confident hit: ", amf$AMF_DISCARDED_NO_HIT),
+    paste0("% ASVs discarded by AMF filter: ", amf$AMF_PCT_ASVS_DISCARDED, "%"),
+    paste0("% reads retained by AMF filter: ", amf$AMF_PCT_READS_RETAINED, "%")
+  )
+  blank_row <- as.data.frame(matrix(NA, nrow = 1, ncol = ncol(qc_final)))
+  names(blank_row) <- names(qc_final)
+  qc_final <- bind_rows(qc_final, blank_row)
+  for (line in amf_lines) {
+    metric_row <- as.data.frame(matrix(NA, nrow = 1, ncol = ncol(qc_final)))
+    names(metric_row) <- names(qc_final)
+    metric_row[[1]] <- line
+    qc_final <- bind_rows(qc_final, metric_row)
+  }
+}
 
 # Append OTU QC summary if OTU was run
 otu_qc_path <- "05_asv2otu/otu_qc_summary.txt"
@@ -137,7 +163,8 @@ readme_content <- paste0(readme_content,
   "- Bootstrap columns: Confidence values (0-100) for each taxonomy rank\n\n",
   "**Interpretation:**\n",
   "- Each row is a unique sequence variant\n",
-  "- Use for: diversity analysis, relative abundance plots, comparative studies\n\n"
+  "- Use for: diversity analysis, relative abundance plots, comparative studies\n",
+  if (AMF_FILTER) "- Only ASVs passing the AMF SILVA screen are included (see `03_dada2/amf_filter/`); OTUs are clustered from all ASVs and screened separately\n\n" else "\n"
 )
 
 if (otu_exists) {

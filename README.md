@@ -50,7 +50,7 @@ run_dada2processing --help
 ```
 **NOTE: It may take 10-15 minutes to install the necessary packages**
 
-**One-time setup for 18S-AMF (lab-wide, only needs to be done once):** the 18S-AMF pipeline screens OTUs against the full SILVA SSU database (see Step 6b). That BLAST database lives in the shared Kennedy lab taxonomy folder. If it has not been built yet, build it once with:
+**One-time setup for 18S-AMF (lab-wide, only needs to be done once):** the 18S-AMF pipeline screens ASVs and OTUs against the full SILVA SSU database (see Steps 2b and 6b). That BLAST database lives in the shared Kennedy lab taxonomy folder. If it has not been built yet, build it once with:
 ```bash
 bash bin/setup_silva_blastdb.sh
 ```
@@ -169,11 +169,11 @@ To run the script, ssh login to the cluster and run `run_dada2processing` from a
 10. Change default wall-time (runtime) on cluster (`--slurm-time`):
         If you have a large amount of samples or really large sequence files with high read depth, OR if a previous run attempt failed because it ran of of time, you may need to extend the time on the cluster using this command. The defaults should be suitable for datasets up to 200+ samples. Default walltimes are 12 hours in general, 36 hours for 18S-V4, and 48 hours for 16S-V4 and for any Aviti dataset.
 11. Skip the AMF SILVA screen (`--skip-amf-filter`, 18S-AMF only):
-        By default, 18S-AMF OTUs are BLASTed against SILVA and only OTUs that match AMF (Glomeromycotina) are kept before MaarjAM taxonomy assignment (see Step 6b). Use this flag to turn that off and keep all OTUs.
+        By default, 18S-AMF ASVs and OTUs are BLASTed against SILVA and only those that match AMF (Glomeromycotina) are kept before MaarjAM taxonomy assignment (see Steps 2b and 6b). Use this flag to turn that off and keep all ASVs and OTUs.
 12. Change default memory allocation (`--slurm-mem`):
         If a previous job failed due to running out of memory. Up your memory allocation using this command. By default the pipeline requests 80gb plus 20gb for every 100 samples (capped at 240gb), which should be suitable for most all datasets.
 13. OTU an existing ASV table only (`--asv-table`):
-        Skips adapter/primer trimming and DADA2 entirely, and runs only the ASV-to-OTU steps (ITSx if requested, VSEARCH, mumu, the AMF SILVA screen for 18S-AMF, and OTU taxonomy) on an ASV table you already have. Useful for re-OTUing an earlier run with different clustering/mumu settings, or for OTUing an ASV table from elsewhere. The table must be tab-separated, with one ASV per row: the first column holds the ASV sequence and the remaining columns hold read counts per sample. Taxonomy and bootstrap columns (Kingdom, Phylum, ... and `*_bootstrap`) are ignored, so the pipeline's own `ProjectName__combined_sequences_ASVtaxa_DatabaseName.txt` works as-is. `--fastq-dir` and `--platform` are not needed, and primer checks are skipped. `--amplicon` is still required (it sets the taxonomy database and mumu defaults). Outputs go to `05_asv2otu/` in the output directory, and the default walltime is 12 hours.
+        Skips adapter/primer trimming and DADA2 entirely, and runs only the ASV-to-OTU steps (ITSx if requested, VSEARCH, mumu, the AMF SILVA screen for 18S-AMF, and OTU taxonomy) on an ASV table you already have. Useful for re-OTUing an earlier run with different clustering/mumu settings, or for OTUing an ASV table from elsewhere. The table must be tab-separated, with one ASV per row: the first column holds the ASV sequence and the remaining columns hold read counts per sample. Taxonomy and bootstrap columns (Kingdom, Phylum, ... and `*_bootstrap`) are ignored, so the pipeline's own `ProjectName__combined_sequences_ASVtaxa_DatabaseName.txt` works as-is. For 18S-AMF, use `03_dada2/ProjectName__ASV_counts_unfiltered.txt` instead, because the combined table has already been through the AMF SILVA screen (see Step 2b). `--fastq-dir` and `--platform` are not needed, and primer checks are skipped. `--amplicon` is still required (it sets the taxonomy database and mumu defaults). Outputs go to `05_asv2otu/` in the output directory, and the default walltime is 12 hours.
 
 Expect a runtime of 1 - 12 hours for most Illumina datasets. Larger datasets (16S-V4, 18S-V4) and Aviti runs take longer, which is why the SLURM script requests more time for them by default (see above) just in case.
 
@@ -208,7 +208,7 @@ run_dada2processing [OPTIONS]
 #  --otu-cluster-id ID       VSEARCH clustering identity (default: 0.97)
 #  --mumu-blast-id PCT       BLAST identity % for mumu (default: 94 for 16S-V4, 84 for others)
 #  --mumu-ratio RATIO        mumu minimum_ratio (default: 100 for 16S-V4, 1 for others)
-#  --skip-amf-filter         18S-AMF only: skip the SILVA BLAST screen that keeps only Glomeromycotina OTUs (default: run it)
+#  --skip-amf-filter         18S-AMF only: skip the SILVA BLAST screen that keeps only Glomeromycotina ASVs and OTUs (default: run it)
 #  --slurm-time TIME         SLURM walltime (HH:MM:SS, default: 12:00:00; 36:00:00 for 18S-V4; 48:00:00 for 16S-V4 and Aviti)
 #  --slurm-mem MEM           SLURM memory allocation (default: 80gb + 20gb per 100 samples, max 240gb)
 #  --help                    Show this help message
@@ -315,6 +315,11 @@ DADA2 is platform designed for stepwise denoising of amplicon sequencing dataset
 4. Merging: forward and reverse reads are merged, with minimum overlap requirements differing based on sequence dataset. NOTE: this is a step where a lot of reads can get thrown out because they cannot merge. This may happen because there is not enough overlap between the forward and reverse reads and is known to be a problem in 18S-V4 and 18S-AMF datasets. If you find that a low percentage of reads are merging, you may want to only use forward reads for your analysis.
 5. Chimera Removal: Based on the error patterns learned by the DADA2 algorithm, it detects what it thinks are possible chimeric sequences based on error patterns and parent abundance. For complicated reasons related to Aviti error patterns, the minimum abundance of the parent required for a chimera merge/removal (minFoldParentOverAbundance) has been changed from 2 to 8 for Aviti datasets. Without these changes, a large proportion of real biological ASVs would be detected as chimeric incorrectly. Talk to Trevor Gould if you want more information on this.
 
+### Step 2b - AMF SILVA Screen of ASVs (18S-AMF only)
+Before ASV taxonomy is assigned, ASVs go through the same SILVA screen and cutoffs as OTUs (see Step 6b), so the final ASV table contains only ASVs that match AMF. Per-ASV decisions, per-sample read retention, and the discarded ASVs with their SILVA taxonomy are in `03_dada2/amf_filter/`, and the counts are reported in `qc_summary.txt`.
+
+**This screen does not affect OTUs.** OTUs are clustered from `03_dada2/ProjectName__ASV_counts_unfiltered.txt`, which holds every ASV after chimera removal, and are then screened separately in Step 6b. `seqtab_nochim.rds` and `sequences.fasta` also keep every ASV.
+
 ### Step 3 - DADA2 RDP Taxonomy Assignment for ASVs
 After the ASVs have been created and denoised, taxonomy is assigned using the *assignTaxonomy* function in DADA2, which uses the RDP Naive Bayesian classifier (doi: 10.1128/AEM.00062-07) to classify sequences. Taxonomy databases are unique to each primer (ITS1 and ITS2 have one database: UNITE sh) and are the same databases used by Trevor Gould to assign taxonomy. I have updated each taxonomy database to their most recent version, and they are located in the Kennedy lab shared taxonomy folder on the MSI computing cluster.
 
@@ -336,7 +341,7 @@ It works in two steps. All sequences are blasted against each other. Sequences w
 
 **Note 2:** *In preliminary testing, mumu was causing problematic merges of the ZyMock community in 16S-V4 bacterial datasets. This was due to a low blast % threshold considered for parent-daughter sequences, and a standard parent-daughter ratio of 1. To fix this, bacteria by default now run mumu with slightly different settings. The minimum BLAST % is 94% and the minimum ratio is 100. This is somewhat informed by the relatively more conserved nature of the 16S region, but is also somewhat arbitrarily chosen. Just expect that the mumu filtering step might merge comparatively less OTUs in 16S datasets compared to others. I do not expect this to change ecological inference. If you are still running into issues where the ZyMock community seems strange, contact me.*
 
-### Step 6b - AMF SILVA Screen (18S-AMF only)
+### Step 6b - AMF SILVA Screen of OTUs (18S-AMF only)
 
 Because the MaarjAM database contains only AMF sequences, DADA2 will assign *every* sequence to Glomeromycota, including plants, other fungi and protists that the AMF primers co-amplify. To prevent this, the curated OTUs are first BLASTed against the full SILVA SSU Ref NR99 database, which covers all domains of life. An OTU is kept only if its best SILVA matches are AMF:
 
@@ -345,7 +350,7 @@ Because the MaarjAM database contains only AMF sequences, DADA2 will assign *eve
 3. The OTU is kept if at least half of its near-top hits are in **Glomeromycotina** (the AMF subphylum). Otherwise it is discarded as `non_AMF`.
 4. OTUs with no hit passing the identity/coverage cutoffs are discarded as `no_confident_hit`.
 
-Only kept OTUs go on to MaarjAM taxonomy assignment and into the final OTU table. The number and percentage of OTUs and reads kept/discarded are reported in `qc_summary.txt`. Per-OTU decisions, per-sample read retention, and a list of discarded OTUs with their SILVA taxonomy are in `05_asv2otu/04b_amf_filter/`. The discarded list is a useful way to see which off-target groups your primers picked up. These cutoffs can be changed in `config.yaml` (`amf_min_id`, `amf_min_qcov`, `amf_top_pct`, `amf_min_frac`, `amf_target_regex`). Use `--skip-amf-filter` to turn the screen off. **Note:** this screen applies to the OTU table only; the ASV table is not filtered.
+Only kept OTUs go on to MaarjAM taxonomy assignment and into the final OTU table. The number and percentage of OTUs and reads kept/discarded are reported in `qc_summary.txt`. Per-OTU decisions, per-sample read retention, and a list of discarded OTUs with their SILVA taxonomy are in `05_asv2otu/04b_amf_filter/`. The discarded list is a useful way to see which off-target groups your primers picked up. These cutoffs can be changed in `config.yaml` (`amf_min_id`, `amf_min_qcov`, `amf_top_pct`, `amf_min_frac`, `amf_target_regex`). Use `--skip-amf-filter` to turn the screen off. **Note:** this step screens the OTU table; the ASV table is screened separately in Step 2b, with the same settings.
 
 **Diagnosing the screen:** if the screen discards more than expected, run the diagnostic script on the finished output directory in an interactive session:
 ```bash
@@ -353,7 +358,7 @@ srun -N 1 --ntasks=8 --mem=32gb --time=1:00:00 -p interactive --pty bash
 bash /path/to/HTS_DADA2processing/bin/diagnose_amf_filter.sh /path/to/output_dir   # optional 2nd argument: number of top OTUs (default 30)
 # ROD_FASTA=/path/to/rod.fasta bash .../diagnose_amf_filter.sh /path/to/output_dir    # also compare against the Ribosomal Operon Database
 ```
-It summarises OTUs, reads and sequence lengths per decision (`AMF`, `non_AMF`, `no_confident_hit`), then BLASTs the most abundant discarded OTUs against SILVA, MaarjAM and Eukaryome *without* the identity/coverage cutoffs and reports each OTU's best hit in each database. Results go to `05_asv2otu/04b_amf_filter/diagnostics/` (`diagnostics_report.txt` is the readable summary). To try different cutoffs quickly, rerun only the OTU steps with `--asv-table` (pointing at the run's `03_dada2/` ASV table) and edit the `amf_*` values in the new `config.yaml` before `sbatch`.
+It summarises OTUs, reads and sequence lengths per decision (`AMF`, `non_AMF`, `no_confident_hit`), then BLASTs the most abundant discarded OTUs against SILVA, MaarjAM and Eukaryome *without* the identity/coverage cutoffs and reports each OTU's best hit in each database. Results go to `05_asv2otu/04b_amf_filter/diagnostics/` (`diagnostics_report.txt` is the readable summary). To try different cutoffs quickly, rerun only the OTU steps with `--asv-table` (pointing at the run's `03_dada2/ProjectName__ASV_counts_unfiltered.txt`) and edit the `amf_*` values in the new `config.yaml` before `sbatch`.
 
 ### Step 7 - DADA2 RDP Taxonomy Assignment
 
@@ -361,7 +366,7 @@ After the OTUs have been created and curated, taxonomy is assigned to the centro
 
 This will likely take the longest of any step in the process -- somewhere between 5-45 minutes depending on how many OTUs there are, and the size of the reference database (PR2 takes the longest). 
 
-**NOTE:** An important note about AMF taxonomy assignment - because the MaarjAM database includes ONLY AMF sequences, DADA2 can ONLY assign sequences as AMF. The AMF SILVA screen (Step 6b) removes OTUs that are not AMF from the OTU table before this step, so the MaarjAM assignments in the OTU table should now be restricted to genuine AMF. This screen is new and still being trialled, so please check `05_asv2otu/04b_amf_filter/amf_filter_discarded.tsv` and your mock community, and let me know if anything looks off. The ASV table is NOT screened, so non-AMF ASVs there will still be assigned to Mucoromycota/Glomeromycota with high bootstrap confidence; take ASV-level assignments with a grain of salt and prefer high-confidence Genus/Virtual Taxa or Family-level assignments.
+**NOTE:** An important note about AMF taxonomy assignment - because the MaarjAM database includes ONLY AMF sequences, DADA2 can ONLY assign sequences as AMF. The AMF SILVA screens (Steps 2b and 6b) remove ASVs and OTUs that are not AMF before taxonomy is assigned, so the MaarjAM assignments in both tables should now be restricted to genuine AMF. This screen is new and still being trialled, so please check `amf_filter_discarded.tsv` (in `05_asv2otu/04b_amf_filter/` and `03_dada2/amf_filter/`) and your mock community, and let me know if anything looks off. With `--skip-amf-filter`, non-AMF sequences will still be assigned to Mucoromycota/Glomeromycota with high bootstrap confidence; take those assignments with a grain of salt and prefer high-confidence Genus/Virtual Taxa or Family-level assignments.
 
 ## Citations
 

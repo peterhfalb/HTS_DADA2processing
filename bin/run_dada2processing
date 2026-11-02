@@ -31,7 +31,7 @@ Optional arguments:
   --otu-cluster-id ID       VSEARCH clustering identity (default: 0.97)
   --mumu-blast-id PCT       BLAST identity % for mumu (default: 94 for 16S-V4, 84 for others)
   --mumu-ratio RATIO        mumu minimum_ratio (default: 100 for 16S-V4, 1 for others)
-  --skip-amf-filter         18S-AMF only: skip the SILVA BLAST screen that keeps only Glomeromycotina OTUs (default: run it)
+  --skip-amf-filter         18S-AMF only: skip the SILVA BLAST screen that keeps only Glomeromycotina ASVs and OTUs (default: run it)
   --slurm-time TIME         SLURM walltime (HH:MM:SS, default: 12:00:00; 36:00:00 for 18S-V4; 48:00:00 for 16S-V4 and Aviti)
   --slurm-mem MEM           SLURM memory allocation (default: 80gb + 20gb per 100 samples, max 240gb)
   --help                    Show this help message
@@ -248,7 +248,7 @@ fi
 # Check SILVA BLAST database for the 18S-AMF SILVA screen
 # (keep path in sync with SILVA_BLAST_DB in the Snakefile)
 SILVA_BLAST_DB="/projects/standard/kennedyp/shared/taxonomy/silva_138.2_NR99_blastdb/SILVA_138.2_NR99"
-if [[ "$AMPLICON" == "18S-AMF" && "$AMF_SILVA_FILTER" -eq 1 && "$SKIP_OTU" -eq 0 ]]; then
+if [[ "$AMPLICON" == "18S-AMF" && "$AMF_SILVA_FILTER" -eq 1 ]]; then
     if [[ ! -f "${SILVA_BLAST_DB}.nsq" && ! -f "${SILVA_BLAST_DB}.nal" ]]; then
         echo "Error: SILVA BLAST database for the AMF screen not found at: $SILVA_BLAST_DB"
         echo "Build it once with:  bash $(dirname "$(readlink -f "$0")")/setup_silva_blastdb.sh"
@@ -628,6 +628,9 @@ if [ "$SKIP_OTU" -eq 0 ]; then
     fi
 else
     echo "--Skipping ASV2OTU--"
+    if [[ "$AMPLICON" == "18S-AMF" ]]; then
+        echo "AMF SILVA filter: $([ "$AMF_SILVA_FILTER" -eq 1 ] && echo 'enabled' || echo 'disabled')"
+    fi
 fi
 echo ""
 echo "--SLURM RESOURCES--"

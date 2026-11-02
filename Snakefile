@@ -38,8 +38,8 @@ OTU_CLUSTER_ID  = config.get("otu_cluster_id", "0.97")
 MUMU_BLAST_ID   = config.get("mumu_blast_id", "84")
 MUMU_RATIO      = config.get("mumu_ratio", "1")
 
-# AMF SILVA screen (18S-AMF only): BLAST mumu-curated OTUs against SILVA and keep
-# only OTUs whose near-top hits are mostly AMF, before MaarjAM taxonomy assignment
+# AMF SILVA screen (18S-AMF only): BLAST ASVs and mumu-curated OTUs against SILVA and keep
+# only those whose near-top hits are mostly AMF, before MaarjAM taxonomy assignment
 AMF_FILTER       = AMPLICON == "18S-AMF" and str(config.get("amf_silva_filter", "1")) == "1"
 AMF_MIN_ID       = config.get("amf_min_id", "90")          # BLAST % identity floor
 AMF_MIN_QCOV     = config.get("amf_min_qcov", "80")        # BLAST % query coverage floor
@@ -89,8 +89,9 @@ else:
     EFFECTIVE_TAXONOMY_DB = TAXONOMY_DB_PATHS[db_name_key]
     DB_NAME = db_name_key
 
-# ASV table feeding the OTU pipeline: the supplied table in OTU-only mode, else DADA2's output
-ASV_INPUT_TABLE = ASV_TABLE if OTU_ONLY else OUTPUT_DIR + f"/03_dada2/{PROJECT_NAME}__combined_sequences_ASVtaxa_{DB_NAME}.txt"
+# ASV table feeding the OTU pipeline: the supplied table in OTU-only mode, else DADA2's unfiltered
+# counts (not the final ASV table, so the ASV AMF screen does not change which OTUs are clustered)
+ASV_INPUT_TABLE = ASV_TABLE if OTU_ONLY else OUTPUT_DIR + f"/03_dada2/{PROJECT_NAME}__ASV_counts_unfiltered.txt"
 
 # Resolve effective primers
 EFFECTIVE_FWD = FWD_PRIMER_OVERRIDE if FWD_PRIMER_OVERRIDE else PRIMERS[AMPLICON]["fwd"]
