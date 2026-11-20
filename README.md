@@ -283,6 +283,17 @@ This will show you a running output of what the pipeline is doing. It's not nece
 After the pipeline is done, or if you want to exit the live view of whats happening, hit Control+C & Enter on Mac (not sure what the equivalent is for Windows).
 
 
+## Not sure which amplicon a file is? (`check_primers`)
+
+If you have a folder of fastq files and don't know which are bacterial, fungal, AMF or protist libraries, run `check_primers` on the folder. It reads the first 5000 reads of each file, looks for the known primers (the same list the pre-run primer check uses) at the start of the reads, and labels each sample. It only reads the files; nothing is moved or changed. It is quick and needs no modules, so it can be run on the login node.
+
+```bash
+check_primers /path/to/raw_fastqs                       # writes amplicon_classification.tsv in the current folder
+check_primers /path/to/raw_fastqs --n-reads 20000 --out my_files.tsv
+```
+
+Each sample gets one of: `bacteria (16S)`, `fungi (ITS1)`, `fungi (ITS2)`, `AMF (18S)`, `protists (18S-V4)`, `18S F04/R22`, `mixed?` (a second primer group is in at least 10% of reads) or `unknown` (no group in at least 50% of reads, usually because the primers aren't in the list or were already trimmed off). The table also gives the top forward and reverse primer per sample and the matching `--amplicon` value for `run_dada2processing`. R1/R2 files are paired by name; single files are checked on their own.
+
 ## Output Files:
 
 The DADA2 pipeline will output a LOT of files, but you will likely be most interested in:

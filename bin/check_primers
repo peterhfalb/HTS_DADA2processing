@@ -1,0 +1,220 @@
+#!/usr/bin/env python3
+"""
+Guess the amplicon (16S bacteria, ITS fungi, 18S AMF, 18S protists, ...) of every FASTQ
+file in a folder, from the primers found at the start of the reads.
+Reads only the first --n-reads reads of each file; never changes or moves files.
+
+Usage:
+    check_primers <fastq_dir> [--n-reads 5000] [--out amplicon_classification.tsv]
+"""
+
+import argparse
+import gzip
+import os
+import re
+import sys
+from collections import Counter
+
+# Reuse the primer lists of the pre-run primer check (single source of truth);
+# no __pycache__ left in the pipeline's bin/
+sys.dont_write_bytecode = True
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+from check_primers_cutadapt import PRIMER_FWD, PRIMER_REV  # noqa: E402
+
+# Group of each primer name in PRIMER_FWD / PRIMER_REV, and the matching --amplicon value
+# (names ending in _fwd/_rev come from primers.json and are grouped by their amplicon)
+GROUPS = {
+    "bacteria (16S)":      ["515f", "806r", "27F", "1492R", "16S-V4_fwd", "16S-V4_rev"],
+    "fungi (ITS1)":        ["ITS1F", "ITS1F_KYO1", "ITS2", "ITS2_KYO2", "ITS1_fwd", "ITS1_rev"],
+    "fungi (ITS2)":        ["5.8S-FUN", "fITS7_1", "5.8SR", "ITS4-Fun", "ITS4_1", "ITS4", "ITS2_fwd", "ITS2_rev"],
+    "AMF (18S)":           ["WANDA_1", "AML2_1", "18S-AMF_fwd", "18S-AMF_rev"],
+    "protists (18S-V4)":   ["616f", "1132r", "18S-V4_fwd", "18S-V4_rev"],
+    "18S F04/R22":         ["F04", "R22"],
+}
+PIPELINE_AMPLICON = {
+    "bacteria (16S)": "16S-V4",
+    "fungi (ITS1)": "ITS1",
+    "fungi (ITS2)": "ITS2",
+    "AMF (18S)": "18S-AMF",
+    "protists (18S-V4)": "18S-V4",
+}
+
+IUPAC = {
+    "A": "A", "C": "C", "G": "G", "T": "T", "U": "T",
+    "R": "AG", "Y": "CT", "S": "CG", "W": "AT", "K": "GT", "M": "AC",
+    "B": "CGT", "D": "AGT", "H": "ACT", "V": "ACG", "N": "ACGT",
+}
+
+MAX_OFFSET = 8          # primer may start up to this many bases in (heterogeneity spacers)
+MAX_MISMATCH_FRAC = 0.1  # allowed mismatches as a fraction of primer length
+CALL_MIN_PCT = 50       # top group must cover this % of reads to be called
+MIXED_MIN_PCT = 10      # a second group above this % flags the file as mixed?
+
+FASTQ_RE = re.compile(r"^(?P<base>.+?)(?P<read>_R[12])(?P<rest>(_001)?\.(fastq|fq)(\.gz)?)$")
+SINGLE_RE = re.compile(r"\.(fastq|fq)(\.gz)?$")
+
+
+def build_primers():
+    """List of (name, allowed-bases per position, max mismatches, group); one entry per sequence"""
+    group_of = {name: group for group, names in GROUPS.items() for name in names}
+    primers, seen = [], set()
+    # Named primers before the primers.json copies, so shared sequences keep the familiar name
+    items = sorted(list(PRIMER_FWD.items()) + list(PRIMER_REV.items()),
+                   key=lambda kv: kv[0].endswith(("_fwd", "_rev")))
+    for name, seq in items:
+        if seq in seen:
+            continue
+        seen.add(seq)
+        if name not in group_of:
+            print(f"WARNING: primer {name} has no group in check_primers; it will be ignored", file=sys.stderr)
+            continue
+        allowed = [set(IUPAC.get(b, "ACGT")) for b in seq.upper()]
+        primers.append((name, allowed, int(len(seq) * MAX_MISMATCH_FRAC), group_of[name]))
+    return primers
+
+
+def best_primer(read, primers):
+    """Name and group of the primer that best matches the start of the read, or (None, None)"""
+    best, best_key = (None, None), None
+    for name, allowed, max_mm, group in primers:
+        for offset in range(MAX_OFFSET + 1):
+            if offset + len(allowed) > len(read):
+                break
+            mm = 0
+            for i, ok in enumerate(allowed):
+                if read[offset + i] not in ok:
+                    mm += 1
+                    if mm > max_mm:
+                        break
+            if mm <= max_mm:
+                key = (mm, offset)
+                if best_key is None or key < best_key:
+                    best, best_key = (name, group), key
+                break  # lowest offset for this primer found
+    return best
+
+
+def read_starts(path, n_reads):
+    """Sequences of the first n_reads reads of a FASTQ(.gz) file"""
+    opener = gzip.open if path.endswith(".gz") else open
+    seqs = []
+    with opener(path, "rt") as f:
+        for i, line in enumerate(f):
+            if i % 4 == 1:
+                seqs.append(line.strip().upper())
+                if len(seqs) >= n_reads:
+                    break
+    return seqs
+
+
+def find_samples(fastq_dir):
+    """[(sample, R1 path, R2 path or None)] for all FASTQ files in the folder"""
+    files = sorted(f for f in os.listdir(fastq_dir) if SINGLE_RE.search(f))
+    samples, used = [], set()
+    for f in files:
+        m = FASTQ_RE.match(f)
+        if m and m.group("read") == "_R1":
+            r2 = m.group("base") + "_R2" + m.group("rest")
+            samples.append((m.group("base"), f, r2 if r2 in files else None))
+            used.update([f, r2])
+    for f in files:
+        if f not in used and not (FASTQ_RE.match(f) and FASTQ_RE.match(f).group("read") == "_R2"):
+            samples.append((SINGLE_RE.sub("", f), f, None))
+    # R2 files without an R1 are checked on their own
+    for f in files:
+        m = FASTQ_RE.match(f)
+        if m and m.group("read") == "_R2" and f not in used:
+            samples.append((m.group("base"), f, None))
+    return sorted(samples)
+
+
+def classify(fastq_dir, sample, r1, r2, primers, n_reads):
+    groups, top_primer = Counter(), {}
+    n_total = 0
+    for label, f in (("R1", r1), ("R2", r2)):
+        if f is None:
+            top_primer[label] = ("-", 0.0)
+            continue
+        seqs = read_starts(os.path.join(fastq_dir, f), n_reads)
+        names = Counter()
+        for s in seqs:
+            name, group = best_primer(s, primers)
+            if name:
+                names[name] += 1
+                groups[group] += 1
+        n_total += len(seqs)
+        if names and seqs:
+            name, n = names.most_common(1)[0]
+            top_primer[label] = (name, 100 * n / len(seqs))
+        else:
+            top_primer[label] = ("none", 0.0)
+
+    ranked = [(g, 100 * n / n_total) for g, n in groups.most_common()] if n_total else []
+    top_group, top_pct = ranked[0] if ranked else ("-", 0.0)
+    second_group, second_pct = ranked[1] if len(ranked) > 1 else ("-", 0.0)
+    if top_pct < CALL_MIN_PCT:
+        call = "unknown"
+    elif second_pct >= MIXED_MIN_PCT:
+        call = "mixed?"
+    else:
+        call = top_group
+    return {
+        "sample": sample,
+        "reads_checked": n_total,
+        "call": call,
+        "amplicon_flag": PIPELINE_AMPLICON.get(call, "-"),
+        "top_group": top_group,
+        "top_group_pct": f"{top_pct:.1f}",
+        "second_group": second_group,
+        "second_group_pct": f"{second_pct:.1f}",
+        "top_R1_primer": top_primer["R1"][0],
+        "top_R1_pct": f"{top_primer['R1'][1]:.1f}",
+        "top_R2_primer": top_primer["R2"][0],
+        "top_R2_pct": f"{top_primer['R2'][1]:.1f}",
+        "R1_file": r1,
+        "R2_file": r2 or "-",
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Guess the amplicon of every FASTQ file in a folder from the primers at the start of the reads")
+    parser.add_argument("fastq_dir", help="Folder with FASTQ(.gz) files")
+    parser.add_argument("--n-reads", type=int, default=5000, help="Reads checked per file (default: 5000)")
+    parser.add_argument("--out", default="amplicon_classification.tsv",
+                        help="Output table (default: amplicon_classification.tsv in the current directory)")
+    args = parser.parse_args()
+
+    if not os.path.isdir(args.fastq_dir):
+        sys.exit(f"ERROR: not a folder: {args.fastq_dir}")
+    samples = find_samples(args.fastq_dir)
+    if not samples:
+        sys.exit(f"ERROR: no .fastq/.fq(.gz) files found in {args.fastq_dir}")
+
+    primers = build_primers()
+    print(f"Checking the first {args.n_reads} reads of {len(samples)} sample(s) in {args.fastq_dir}\n")
+
+    rows = []
+    for sample, r1, r2 in samples:
+        row = classify(args.fastq_dir, sample, r1, r2, primers, args.n_reads)
+        rows.append(row)
+        print(f"  {sample:40} {row['call']:20} top: {row['top_group']} {row['top_group_pct']}%  "
+              f"R1: {row['top_R1_primer']} {row['top_R1_pct']}%  R2: {row['top_R2_primer']} {row['top_R2_pct']}%")
+
+    cols = list(rows[0].keys())
+    with open(args.out, "w") as f:
+        f.write("\t".join(cols) + "\n")
+        for row in rows:
+            f.write("\t".join(str(row[c]) for c in cols) + "\n")
+
+    print("\nSummary:")
+    for call, n in Counter(r["call"] for r in rows).most_common():
+        flag = PIPELINE_AMPLICON.get(call)
+        print(f"  {call:20} {n:5} sample(s)" + (f"   (run_dada2processing --amplicon {flag})" if flag else ""))
+    print(f"\nTable written to: {os.path.abspath(args.out)}")
+    print(f"'unknown' = no primer group in >= {CALL_MIN_PCT}% of reads (unlisted primers, or primers already trimmed);")
+    print(f"'mixed?'  = a second group in >= {MIXED_MIN_PCT}% of reads.")
+
+
+if __name__ == "__main__":
+    main()
