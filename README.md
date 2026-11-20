@@ -294,6 +294,14 @@ check_primers /path/to/raw_fastqs --n-reads 20000 --out my_files.tsv
 
 Each sample gets one of: `bacteria (16S)`, `fungi (ITS1)`, `fungi (ITS2)`, `AMF (18S)`, `protists (18S-V4)`, `18S F04/R22`, `mixed?` (a second primer group is in at least 10% of reads) or `unknown` (no group in at least 50% of reads, usually because the primers aren't in the list or were already trimmed off). The table also gives the top forward and reverse primer per sample and the matching `--amplicon` value for `run_dada2processing`. R1/R2 files are paired by name; single files are checked on their own.
 
+**What are the reads? (`--blast`)** To see what organisms a `mixed?` or `unknown` sample actually contains, whatever primers were used, add `--blast`. The 50 most common R1 sequences of each of those samples (first 150 bp) are BLASTed against SILVA (16S/18S: bacteria, archaea, chloroplasts, mitochondria, eukaryote 18S such as AMF and protists) and UNITE (ITS: fungi, plus plants and other eukaryotes); each sequence gets the label of its better hit, and hits below 80% identity or 60% query coverage count as `no hit`. The result is the share of those reads per group, e.g. `Bacteria 58%, Fungi 39%, no hit 3%`, plus the best hit of the most common sequence. `--blast-all` does this for every sample, which is useful because primer-matched samples can still contain off-target organisms (e.g. plant ITS amplified by ITS primers).
+```bash
+module load blast-plus
+check_primers /path/to/raw_fastqs --blast          # only mixed?/unknown samples: seconds, fine on the login node
+check_primers /path/to/raw_fastqs --blast-all      # every sample: better in an interactive session (--threads 4)
+```
+`blast_reads_covered_pct` is the share of the reads checked that the 50 sequences represent; if it is very low, the result describes only a small part of the sample. The UNITE BLAST database is built in a temporary folder on each run until it has been built once for the lab with `bash bin/setup_unite_blastdb.sh`.
+
 ## Output Files:
 
 The DADA2 pipeline will output a LOT of files, but you will likely be most interested in:

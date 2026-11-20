@@ -4,15 +4,24 @@ Guess the amplicon (16S bacteria, ITS fungi, 18S AMF, 18S protists, ...) of ever
 file in a folder, from the primers found at the start of the reads.
 Reads only the first --n-reads reads of each file; never changes or moves files.
 
+With --blast, the most common sequences of samples called mixed? or unknown (or of every
+sample, with --blast-all) are BLASTed against SILVA (16S/18S) and UNITE (ITS) to show what
+the reads are, whatever primers were used. Needs blastn: module load blast-plus
+
 Usage:
     check_primers <fastq_dir> [--n-reads 5000] [--out amplicon_classification.tsv]
+    check_primers <fastq_dir> --blast        # also BLAST mixed?/unknown samples
+    check_primers <fastq_dir> --blast-all    # also BLAST every sample
 """
 
 import argparse
 import gzip
 import os
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 from collections import Counter
 
 # Reuse the primer lists of the pre-run primer check (single source of truth);
@@ -49,6 +58,19 @@ MAX_OFFSET = 8          # primer may start up to this many bases in (heterogenei
 MAX_MISMATCH_FRAC = 0.1  # allowed mismatches as a fraction of primer length
 CALL_MIN_PCT = 50       # top group must cover this % of reads to be called
 MIXED_MIN_PCT = 10      # a second group above this % flags the file as mixed?
+
+# BLAST references (keep in sync with SILVA_BLAST_DB and TAXONOMY_DB_PATHS["UNITE"] in the
+# Snakefile; the UNITE BLAST db is built once with bin/setup_unite_blastdb.sh).
+# Each can be overridden with an environment variable of the same name.
+TAX_DIR = "/projects/standard/kennedyp/shared/taxonomy"
+SILVA_DB = os.environ.get("SILVA_DB", TAX_DIR + "/silva_138.2_NR99_blastdb/SILVA_138.2_NR99")
+UNITE_FASTA = os.environ.get("UNITE_FASTA", TAX_DIR + "/sh_general_release_dynamic_all_19.02.2025_wKennedySynmock.fasta")
+UNITE_DB = os.environ.get("UNITE_DB", TAX_DIR + "/unite_blastdb/UNITE_all_19.02.2025")
+
+BLAST_TOP_SEQS = 50      # most common sequences BLASTed per sample
+BLAST_QUERY_LEN = 150    # sequences are compared on their first bases (fewer sequencing errors)
+BLAST_MIN_ID = 80        # a hit must have >= this % identity ...
+BLAST_MIN_QCOV = 60      # ... over >= this % of the query, otherwise "no hit"
 
 FASTQ_RE = re.compile(r"^(?P<base>.+?)(?P<read>_R[12])(?P<rest>(_001)?\.(fastq|fq)(\.gz)?)$")
 SINGLE_RE = re.compile(r"\.(fastq|fq)(\.gz)?$")
@@ -129,13 +151,17 @@ def find_samples(fastq_dir):
 
 
 def classify(fastq_dir, sample, r1, r2, primers, n_reads):
+    """Primer-based call for one sample; also returns the R1 read starts for --blast"""
     groups, top_primer = Counter(), {}
     n_total = 0
+    r1_seqs = []
     for label, f in (("R1", r1), ("R2", r2)):
         if f is None:
             top_primer[label] = ("-", 0.0)
             continue
         seqs = read_starts(os.path.join(fastq_dir, f), n_reads)
+        if label == "R1":
+            r1_seqs = seqs
         names = Counter()
         for s in seqs:
             name, group = best_primer(s, primers)
@@ -173,7 +199,114 @@ def classify(fastq_dir, sample, r1, r2, primers, n_reads):
         "top_R2_pct": f"{top_primer['R2'][1]:.1f}",
         "R1_file": r1,
         "R2_file": r2 or "-",
-    }
+    }, r1_seqs
+
+
+def blast_group(title):
+    """Broad group of a SILVA ("<accession> Bacteria;...") or UNITE ("...|k__Fungi;...") hit title"""
+    t = title.lower()
+    if "chloroplast" in t and "chloroplastida" not in t:
+        return "Chloroplast"
+    if "mitochondria" in t:
+        return "Mitochondria"
+    if "glomeromyc" in t:
+        return "AMF"
+    if "k__fungi" in t or ";fungi;" in t:
+        return "Fungi"
+    if "k__viridiplantae" in t or "chloroplastida" in t:
+        return "Plants/green algae"
+    if "k__metazoa" in t or "metazoa" in t:
+        return "Animals"
+    tax = re.sub(r"^[^;\s]+\s+(?=[^;]*;)", "", title)  # drop a leading SILVA accession
+    if tax.startswith("Bacteria"):
+        return "Bacteria"
+    if tax.startswith("Archaea"):
+        return "Archaea"
+    if tax.startswith("Eukaryota") or "k__" in t:
+        return "Protists/other eukaryotes"
+    return "Other"
+
+
+def has_blastdb(db):
+    return os.path.exists(db + ".nsq") or os.path.exists(db + ".nal")
+
+
+def blast_databases(tmpdir):
+    """{name: BLAST db path}; UNITE is built in tmpdir if there is no prebuilt db"""
+    dbs = {}
+    if has_blastdb(SILVA_DB):
+        dbs["SILVA"] = SILVA_DB
+    else:
+        print(f"WARNING: SILVA BLAST db not found at {SILVA_DB}; 16S/18S reads will show as no hit",
+              file=sys.stderr)
+    if has_blastdb(UNITE_DB):
+        dbs["UNITE"] = UNITE_DB
+    elif os.path.exists(UNITE_FASTA):
+        print("Building a temporary UNITE BLAST db (build it once with bin/setup_unite_blastdb.sh "
+              "to skip this)...")
+        subprocess.run(["makeblastdb", "-in", UNITE_FASTA, "-dbtype", "nucl", "-out",
+                        os.path.join(tmpdir, "UNITE")], stdout=subprocess.DEVNULL, check=True)
+        dbs["UNITE"] = os.path.join(tmpdir, "UNITE")
+    else:
+        print(f"WARNING: UNITE fasta not found at {UNITE_FASTA}; ITS reads will show as no hit",
+              file=sys.stderr)
+    return dbs
+
+
+def blast_samples(rows, r1_seqs, threads):
+    """Add blast_* columns to rows that have r1_seqs (the samples to BLAST)"""
+    if not shutil.which("blastn"):
+        sys.exit("ERROR: blastn not found. Load it first:  module load blast-plus")
+
+    # Most common read starts per sample; identical sequences are BLASTed once across samples
+    top, query_ids = {}, {}
+    for sample, seqs in r1_seqs.items():
+        starts = Counter(s[:BLAST_QUERY_LEN] for s in seqs if len(s) >= BLAST_QUERY_LEN)
+        top[sample] = starts.most_common(BLAST_TOP_SEQS)
+        for seq, _ in top[sample]:
+            query_ids.setdefault(seq, f"q{len(query_ids) + 1}")
+
+    best = {}  # query id -> (bitscore, group, title)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        dbs = blast_databases(tmpdir)
+        if not dbs:
+            sys.exit("ERROR: no BLAST databases available")
+        query_fasta = os.path.join(tmpdir, "queries.fasta")
+        with open(query_fasta, "w") as f:
+            for seq, qid in query_ids.items():
+                f.write(f">{qid}\n{seq}\n")
+        print(f"BLASTing {len(query_ids)} sequences from {len(top)} sample(s) against "
+              f"{' and '.join(dbs)} ({threads} thread(s))...")
+        for db in dbs.values():
+            out = subprocess.run(
+                ["blastn", "-query", query_fasta, "-db", db,
+                 "-outfmt", "6 qseqid pident qcovhsp bitscore stitle",
+                 "-max_target_seqs", "5", "-max_hsps", "1", "-evalue", "1e-10",
+                 "-num_threads", str(threads)],
+                stdout=subprocess.PIPE, universal_newlines=True, check=True).stdout
+            for line in out.splitlines():
+                qid, pident, qcov, bitscore, title = line.split("\t", 4)
+                if float(pident) < BLAST_MIN_ID or float(qcov) < BLAST_MIN_QCOV:
+                    continue
+                if qid not in best or float(bitscore) > best[qid][0]:
+                    best[qid] = (float(bitscore), blast_group(title), title)
+
+    for row in rows:
+        if row["sample"] not in top:
+            row.update(blast_summary="-", blast_reads_covered_pct="-", blast_top_seq_hit="-")
+            continue
+        weights, n_top = Counter(), 0
+        for seq, n in top[row["sample"]]:
+            hit = best.get(query_ids[seq])
+            weights[hit[1] if hit else "no hit"] += n
+            n_top += n
+        n_reads = len(r1_seqs[row["sample"]])
+        first = best.get(query_ids[top[row["sample"]][0][0]]) if top[row["sample"]] else None
+        row.update(
+            blast_summary=", ".join(f"{g} {100 * n / n_top:.0f}%" for g, n in weights.most_common()) or "no reads",
+            blast_reads_covered_pct=f"{100 * n_top / n_reads:.1f}" if n_reads else "0.0",
+            blast_top_seq_hit=first[2] if first else "no hit",
+        )
 
 
 def main():
@@ -183,7 +316,14 @@ def main():
     parser.add_argument("--n-reads", type=int, default=5000, help="Reads checked per file (default: 5000)")
     parser.add_argument("--out", default="amplicon_classification.tsv",
                         help="Output table (default: amplicon_classification.tsv in the current directory)")
+    parser.add_argument("--blast", action="store_true",
+                        help="BLAST the most common sequences of mixed?/unknown samples against SILVA and UNITE "
+                             "(needs: module load blast-plus)")
+    parser.add_argument("--blast-all", action="store_true", help="Like --blast, but for every sample")
+    parser.add_argument("--threads", type=int, default=1, help="BLAST threads (default: 1)")
     args = parser.parse_args()
+    if (args.blast or args.blast_all) and not shutil.which("blastn"):
+        sys.exit("ERROR: blastn not found. Load it first:  module load blast-plus")
 
     if not os.path.isdir(args.fastq_dir):
         sys.exit(f"ERROR: not a folder: {args.fastq_dir}")
@@ -194,12 +334,28 @@ def main():
     primers = build_primers()
     print(f"Checking the first {args.n_reads} reads of {len(samples)} sample(s) in {args.fastq_dir}\n")
 
-    rows = []
+    rows, r1_seqs = [], {}
     for sample, r1, r2 in samples:
-        row = classify(args.fastq_dir, sample, r1, r2, primers, args.n_reads)
+        row, seqs = classify(args.fastq_dir, sample, r1, r2, primers, args.n_reads)
         rows.append(row)
+        if args.blast_all or (args.blast and row["call"] in ("mixed?", "unknown")):
+            r1_seqs[sample] = seqs
         print(f"  {sample:40} {row['call']:20} top: {row['top_group']} {row['top_group_pct']}%  "
               f"R1: {row['top_R1_primer']} {row['top_R1_pct']}%  R2: {row['top_R2_primer']} {row['top_R2_pct']}%")
+
+    if args.blast or args.blast_all:
+        print()
+        if r1_seqs:
+            blast_samples(rows, r1_seqs, args.threads)
+            print(f"\nBLAST of the {BLAST_TOP_SEQS} most common R1 sequences (share of their reads by best hit):")
+            for row in rows:
+                if row["blast_summary"] != "-":
+                    print(f"  {row['sample']:40} {row['blast_summary']}   "
+                          f"(top sequences = {row['blast_reads_covered_pct']}% of reads checked)")
+        else:
+            print("No mixed? or unknown samples to BLAST (use --blast-all to BLAST every sample)")
+            for row in rows:
+                row.update(blast_summary="-", blast_reads_covered_pct="-", blast_top_seq_hit="-")
 
     cols = list(rows[0].keys())
     with open(args.out, "w") as f:
